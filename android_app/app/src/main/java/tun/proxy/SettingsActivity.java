@@ -33,12 +33,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class SettingsActivity extends AppCompatActivity {
+
     private static final String TAG = "SettingsActivity";
     private static final String TITLE_TAG = "Settings";
+
+    private ExecutorService executorService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        executorService = Executors.newSingleThreadExecutor();
         setContentView(R.layout.activity_settings);
         if (savedInstanceState == null) {
             getSupportFragmentManager()

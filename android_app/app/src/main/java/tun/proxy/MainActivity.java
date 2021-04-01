@@ -31,7 +31,6 @@ import android.widget.Button;
 import android.widget.EditText;
 
 import tun.proxy.service.Tun2HttpVpnService;
-import tun.utils.CertificateUtil;
 import tun.utils.IPUtil;
 
 public class MainActivity extends AppCompatActivity implements
