@@ -4,6 +4,8 @@
 #include <stdlib.h> /* malloc() */
 #include <string.h> /* strncpy() */
 #include <sys/socket.h>
+#include <android/log.h>
+#include <tun2http.h>
 
 #define TLS_HEADER_LEN 5
 #define TLS_HANDSHAKE_CONTENT_TYPE 0x16
@@ -92,6 +94,7 @@ void parse_tls_header(const char *data, size_t data_len, char *hostname)
     size_t pos = TLS_HEADER_LEN;
     size_t len;
 
+    log_android_hex(ANDROID_LOG_INFO, "TLS data: ", (unsigned char *) data, data_len);
     /*
      * Check that our TCP payload is at least large enough for a
      * TLS header
@@ -180,4 +183,5 @@ void parse_tls_header(const char *data, size_t data_len, char *hostname)
         return;
 
     parse_extensions(data + pos, len, hostname);
+    log_android(ANDROID_LOG_INFO, "Server Name Indication: %s", hostname);
 }

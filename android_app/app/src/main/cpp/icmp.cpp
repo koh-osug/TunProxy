@@ -65,10 +65,10 @@ void check_icmp_socket(const struct arguments *args, const struct epoll_event *e
     else {
         // Check socket read
         if (ev->events & EPOLLIN) {
-            s->icmp.time = time(NULL);
+            s->icmp.time = time(nullptr);
 
             uint16_t blen = (uint16_t) (s->icmp.version == 4 ? ICMP4_MAXMSG : ICMP6_MAXMSG);
-            uint8_t *buffer = malloc(blen);
+            uint8_t *buffer = static_cast<uint8_t *>(malloc(blen));
             ssize_t bytes = recv(s->socket, buffer, blen, 0);
             if (bytes < 0) {
                 // Socket error
@@ -159,7 +159,7 @@ jboolean handle_icmp(const struct arguments *args,
 
     // Search session
     struct ng_session *cur = ng_session;
-    while (cur != NULL &&
+    while (cur != nullptr &&
            !((cur->protocol == IPPROTO_ICMP || cur->protocol == IPPROTO_ICMPV6) &&
              !cur->icmp.stop && cur->icmp.version == version &&
              (version == 4 ? cur->icmp.saddr.ip4 == ip4->saddr &&
@@ -169,14 +169,14 @@ jboolean handle_icmp(const struct arguments *args,
         cur = cur->next;
 
     // Create new session if needed
-    if (cur == NULL) {
+    if (cur == nullptr) {
         log_android(ANDROID_LOG_INFO, "ICMP new session from %s to %s", source, dest);
 
         // Register session
-        struct ng_session *s = malloc(sizeof(struct ng_session));
+        struct ng_session *s = (struct ng_session *)malloc(sizeof(struct ng_session));
         s->protocol = (uint8_t) (version == 4 ? IPPROTO_ICMP : IPPROTO_ICMPV6);
 
-        s->icmp.time = time(NULL);
+        s->icmp.time = time(nullptr);
         s->icmp.uid = uid;
         s->icmp.version = version;
 
@@ -192,7 +192,7 @@ jboolean handle_icmp(const struct arguments *args,
         s->icmp.id = icmp->icmp_id; // store original ID
 
         s->icmp.stop = 0;
-        s->next = NULL;
+        s->next = nullptr;
 
         // Open UDP socket
         s->socket = open_icmp_socket(args, &s->icmp);
@@ -238,7 +238,7 @@ jboolean handle_icmp(const struct arguments *args,
                 source, dest,
                 icmp->icmp_type, icmp->icmp_code, icmp->icmp_id, icmp->icmp_seq, icmplen);
 
-    cur->icmp.time = time(NULL);
+    cur->icmp.time = time(nullptr);
 
     struct sockaddr_in server4;
     struct sockaddr_in6 server6;
@@ -255,7 +255,7 @@ jboolean handle_icmp(const struct arguments *args,
 
     // Send raw ICMP message
     if (sendto(cur->socket, icmp, (socklen_t) icmplen, MSG_NOSIGNAL,
-               (const struct sockaddr *) (version == 4 ? &server4 : &server6),
+               (const struct sockaddr *) (version == 4 ? (struct sockaddr *)&server4 :  (struct sockaddr *)&server6),
                (socklen_t) (version == 4 ? sizeof(server4) : sizeof(server6))) != icmplen) {
         log_android(ANDROID_LOG_ERROR, "ICMP sendto error %d: %s", errno, strerror(errno));
         if (errno != EINTR && errno != EAGAIN) {
@@ -295,7 +295,7 @@ ssize_t write_icmp(const struct arguments *args, const struct icmp_session *cur,
     // Build packet
     if (cur->version == 4) {
         len = sizeof(struct iphdr) + datalen;
-        buffer = malloc(len);
+        buffer = static_cast<u_int8_t *>(malloc(len));
         struct iphdr *ip4 = (struct iphdr *) buffer;
         if (datalen)
             memcpy(buffer + sizeof(struct iphdr), data, datalen);
@@ -315,7 +315,7 @@ ssize_t write_icmp(const struct arguments *args, const struct icmp_session *cur,
     }
     else {
         len = sizeof(struct ip6_hdr) + datalen;
-        buffer = malloc(len);
+        buffer = static_cast<u_int8_t *>(malloc(len));
         struct ip6_hdr *ip6 = (struct ip6_hdr *) buffer;
         if (datalen)
             memcpy(buffer + sizeof(struct ip6_hdr), data, datalen);
@@ -332,9 +332,9 @@ ssize_t write_icmp(const struct arguments *args, const struct icmp_session *cur,
     }
 
     inet_ntop(cur->version == 4 ? AF_INET : AF_INET6,
-              cur->version == 4 ? &cur->saddr.ip4 : &cur->saddr.ip6, source, sizeof(source));
+              cur->version == 4 ? (void *)&cur->saddr.ip4 : (void *)&cur->saddr.ip6, source, sizeof(source));
     inet_ntop(cur->version == 4 ? AF_INET : AF_INET6,
-              cur->version == 4 ? &cur->daddr.ip4 : &cur->daddr.ip6, dest, sizeof(dest));
+              cur->version == 4 ? (void *)&cur->daddr.ip4 : (void *)&cur->daddr.ip6, dest, sizeof(dest));
 
     // Send raw ICMP message
     log_android(ANDROID_LOG_WARN,

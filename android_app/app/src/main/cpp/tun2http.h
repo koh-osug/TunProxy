@@ -244,7 +244,7 @@ typedef struct dns_rr {
     __be16 qclass;
     __be32 ttl;
     __be16 rdlength;
-} __packed;
+} __packed dns_rr;
 
 // DHCP
 
@@ -266,12 +266,12 @@ typedef struct dhcp_packet {
     uint8_t sname[64];
     uint8_t file[128];
     uint32_t option_format;
-} __packed;
+} __packed dhcp_packet;
 
 typedef struct dhcp_option {
     uint8_t code;
     uint8_t length;
-} __packed;
+} __packed dhcp_option;
 
 // Prototypes
 
@@ -448,6 +448,8 @@ int jniCheckException(JNIEnv *env);
 int sdk_int(JNIEnv *env);
 
 void log_android(int prio, const char *fmt, ...);
+
+void log_android_hex(int prio, const char *msg, unsigned char *buffer, int bufferLength);
 
 void log_packet(const struct arguments *args, jobject jpacket);
 

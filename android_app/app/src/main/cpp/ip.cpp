@@ -27,7 +27,7 @@ int check_tun(const struct arguments *args,
 
     // Check tun read
     if (ev->events & EPOLLIN) {
-        uint8_t *buffer = malloc(get_mtu()*2);
+        uint8_t *buffer = static_cast<uint8_t *>(malloc(get_mtu() * 2));
         ssize_t length = read(args->tun, buffer, get_mtu());
         if (length < 0) {
             free(buffer);
@@ -317,7 +317,7 @@ jint get_uid_sub(const int version, const int protocol,
     // https://android.googlesource.com/platform/system/sepolicy/+/master/private/app.te (netlink_tcpdiag_socket)
 
     // Get proc file name
-    char *fn = NULL;
+    const char *fn = nullptr;
     if (protocol == IPPROTO_ICMP && version == 4)
         fn = "/proc/net/icmp";
     else if (protocol == IPPROTO_ICMPV6 && version == 6)
@@ -331,7 +331,7 @@ jint get_uid_sub(const int version, const int protocol,
 
     // Open proc file
     FILE *fd = fopen(fn, "r");
-    if (fd == NULL) {
+    if (fd == nullptr) {
         log_android(ANDROID_LOG_ERROR, "fopen %s error %d: %s", fn, errno, strerror(errno));
         return uid;
     }

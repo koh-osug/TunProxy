@@ -6,15 +6,15 @@ extern int pipefds[2];
 extern pthread_t thread_id;
 extern pthread_mutex_t lock;
 
-struct ng_session *ng_session = NULL;
+struct ng_session *ng_session = nullptr;
 
 void init(const struct arguments *args) {
-    ng_session = NULL;
+    ng_session = nullptr;
 }
 
 void clear() {
     struct ng_session *s = ng_session;
-    while (s != NULL) {
+    while (s != nullptr) {
         if (s->socket >= 0 && close(s->socket))
             log_android(ANDROID_LOG_ERROR, "close %d error %d: %s",
                         s->socket, errno, strerror(errno));
@@ -24,7 +24,7 @@ void clear() {
         s = s->next;
         free(p);
     }
-    ng_session = NULL;
+    ng_session = nullptr;
 }
 
 void *handle_events(void *a) {
@@ -33,10 +33,10 @@ void *handle_events(void *a) {
 
     // Attach to Java
     JNIEnv *env;
-    jint rs = (*jvm)->AttachCurrentThread(jvm, &env, NULL);
+    jint rs = jvm->AttachCurrentThread(&env, nullptr);
     if (rs != JNI_OK) {
         log_android(ANDROID_LOG_ERROR, "AttachCurrentThread failed");
-        return NULL;
+        return nullptr;
     }
     args->env = env;
 
@@ -78,7 +78,7 @@ void *handle_events(void *a) {
     struct epoll_event ev_tun;
     memset(&ev_tun, 0, sizeof(struct epoll_event));
     ev_tun.events = EPOLLIN | EPOLLERR;
-    ev_tun.data.ptr = NULL;
+    ev_tun.data.ptr = nullptr;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, args->tun, &ev_tun)) {
         log_android(ANDROID_LOG_ERROR, "epoll add tun error %d: %s", errno, strerror(errno));
         stopping = 1;
@@ -97,7 +97,7 @@ void *handle_events(void *a) {
         int usessions = 0;
         int tsessions = 0;
         struct ng_session *s = ng_session;
-        while (s != NULL) {
+        while (s != nullptr) {
             if (s->protocol == IPPROTO_ICMP || s->protocol == IPPROTO_ICMPV6) {
                 if (!s->icmp.stop)
                     isessions++;
@@ -119,10 +119,10 @@ void *handle_events(void *a) {
         if (ms - last_check > EPOLL_MIN_CHECK) {
             last_check = ms;
 
-            time_t now = time(NULL);
-            struct ng_session *sl = NULL;
+            time_t now = time(nullptr);
+            struct ng_session *sl = nullptr;
             s = ng_session;
-            while (s != NULL) {
+            while (s != nullptr) {
                 int del = 0;
                 if (s->protocol == IPPROTO_ICMP || s->protocol == IPPROTO_ICMPV6) {
                     del = check_icmp_session(args, s, sessions, maxsessions);
@@ -151,7 +151,7 @@ void *handle_events(void *a) {
                 }
 
                 if (del) {
-                    if (sl == NULL)
+                    if (sl == nullptr)
                         ng_session = s->next;
                     else
                         sl->next = s->next;
@@ -214,7 +214,7 @@ void *handle_events(void *a) {
                         log_android(ANDROID_LOG_WARN, "Read pipe");
                     break;
 
-                } else if (ev[i].data.ptr == NULL) {
+                } else if (ev[i].data.ptr == nullptr) {
                     // Check upstream
                     log_android(ANDROID_LOG_DEBUG, "epoll ready %d/%d in %d out %d err %d hup %d",
                                 i, ready,
@@ -268,10 +268,10 @@ void *handle_events(void *a) {
         log_android(ANDROID_LOG_ERROR,
                     "epoll close error %d: %s", errno, strerror(errno));
 
-    (*env)->DeleteGlobalRef(env, args->instance);
+    env->DeleteGlobalRef(args->instance);
 
     // Detach from Java
-    rs = (*jvm)->DetachCurrentThread(jvm);
+    rs = jvm->DetachCurrentThread();
     if (rs != JNI_OK)
         log_android(ANDROID_LOG_ERROR, "DetachCurrentThread failed");
 
@@ -280,16 +280,16 @@ void *handle_events(void *a) {
 
     log_android(ANDROID_LOG_WARN, "Stopped events tun=%d thread %x", args->tun, thread_id);
     thread_id = 0;
-    return NULL;
+    return nullptr;
 }
 
 void check_allowed(const struct arguments *args) {
     char source[INET6_ADDRSTRLEN + 1];
     char dest[INET6_ADDRSTRLEN + 1];
 
-    struct ng_session *l = NULL;
+    struct ng_session *l = nullptr;
     struct ng_session *s = ng_session;
-    while (s != NULL) {
+    while (s != nullptr) {
         if (s->protocol == IPPROTO_ICMP || s->protocol == IPPROTO_ICMPV6) {
             if (!s->icmp.stop) {
                 if (s->icmp.version == 4) {
@@ -322,7 +322,7 @@ void check_allowed(const struct arguments *args) {
             } else if (s->udp.state == UDP_BLOCKED) {
                 log_android(ANDROID_LOG_WARN, "UDP remove blocked session uid %d", s->udp.uid);
 
-                if (l == NULL)
+                if (l == nullptr)
                     ng_session = s->next;
                 else
                     l->next = s->next;

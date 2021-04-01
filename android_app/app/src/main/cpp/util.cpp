@@ -1,13 +1,15 @@
 
 
 #include "tun2http.h"
+#include <android/log.h>
+#include <stdarg.h>
 
 extern int loglevel;
 
 uint16_t calc_checksum(uint16_t start, const uint8_t *buffer, size_t length) {
-    register uint32_t sum = start;
-    register uint16_t *buf = (uint16_t *) buffer;
-    register size_t len = length;
+    uint32_t sum = start;
+    uint16_t *buf = (uint16_t *) buffer;
+    size_t len = length;
 
     while (len > 1) {
         sum += *buf++;
@@ -39,12 +41,41 @@ int compare_u32(uint32_t s1, uint32_t s2) {
 
 int sdk_int(JNIEnv *env) {
     jclass clsVersion = jniFindClass(env, "android/os/Build$VERSION");
-    jfieldID fid = (*env)->GetStaticFieldID(env, clsVersion, "SDK_INT", "I");
-    return (*env)->GetStaticIntField(env, clsVersion, fid);
+    jfieldID fid = env->GetStaticFieldID(clsVersion, "SDK_INT", "I");
+    return env->GetStaticIntField(clsVersion, fid);
 }
 
 void log_android(int prio, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    __android_log_vprint(prio, "TunProxy", fmt, args);
+    va_end(args);
+}
 
+void log_android_hex(int prio, const char *msg, unsigned char *buffer, int bufferLength) {
+    char *bufferMsg;
+    int i;
+    // each hex string needs the double size + termination
+    bufferMsg = (char *) malloc(bufferLength * sizeof(char) * 2 + sizeof(char));
+    // allocation did not succeed
+    if (bufferMsg == NULL) {
+        log_android(ANDROID_LOG_ERROR, "%sLOG ERROR: Could not allocate log buffer.", msg);
+        return;
+    }
+    for (i = 0; i < bufferLength; i++) {
+        snprintf(bufferMsg + (i * 2), (bufferLength - i) * sizeof(char) * 2 + sizeof(char), "%02X",
+                 (buffer[i] & 0x00FF));
+    }
+    bufferMsg[i] = '\0';
+    // print msg or not
+    if ((msg == NULL) || (strlen(msg) == 0)) {
+        log_android(prio, "%s", bufferMsg);
+    } else {
+        log_android(prio, "%s%s", msg, bufferMsg);
+    }
+    if (bufferMsg) {
+        free(bufferMsg);
+    }
 }
 
 uint8_t char2nible(const char c) {

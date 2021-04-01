@@ -1,7 +1,7 @@
 
 #include "tun2http.h"
 
-JavaVM *jvm = NULL;
+JavaVM *jvm = nullptr;
 int pipefds[2];
 pthread_t thread_id = 0;
 pthread_mutex_t lock;
@@ -16,7 +16,7 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     log_android(ANDROID_LOG_INFO, "JNI load");
 
     JNIEnv *env;
-    if ((*vm)->GetEnv(vm, (void **) &env, JNI_VERSION_1_6) != JNI_OK) {
+    if (vm->GetEnv((void **) &env, JNI_VERSION_1_6) != JNI_OK) {
         log_android(ANDROID_LOG_INFO, "JNI load GetEnv failed");
         return -1;
     }
@@ -41,13 +41,13 @@ void JNI_OnUnload(JavaVM *vm, void *reserved) {
     log_android(ANDROID_LOG_INFO, "JNI unload");
 
     JNIEnv *env;
-    if ((*vm)->GetEnv(vm, (void **) &env, JNI_VERSION_1_6) != JNI_OK)
+    if (vm->GetEnv((void **) &env, JNI_VERSION_1_6) != JNI_OK)
         log_android(ANDROID_LOG_INFO, "JNI load GetEnv failed");
 }
 
 // JNI ServiceSinkhole
 
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_tun_proxy_service_Tun2HttpVpnService_jni_1init(JNIEnv *env, jobject instance) {
     loglevel = ANDROID_LOG_WARN;
 
@@ -56,7 +56,7 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1init(JNIEnv *env, jobject instanc
     args.instance = instance;
     init(&args);
 
-    if (pthread_mutex_init(&lock, NULL))
+    if (pthread_mutex_init(&lock, nullptr))
         log_android(ANDROID_LOG_ERROR, "pthread_mutex_init failed");
 
     // Create signal pipe
@@ -71,11 +71,11 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1init(JNIEnv *env, jobject instanc
         }
 }
 
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_tun_proxy_service_Tun2HttpVpnService_jni_1start(
         JNIEnv *env, jobject instance, jint tun, jboolean fwd53, jint rcode, jstring proxyIp, jint proxyPort) {
 
-    const char *proxy_ip = (*env)->GetStringUTFChars(env, proxyIp, 0);
+    const char *proxy_ip = env->GetStringUTFChars(proxyIp, nullptr);
 
     max_tun_msg = 0;
 
@@ -88,14 +88,14 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1start(
     if (thread_id && pthread_kill(thread_id, 0) == 0)
         log_android(ANDROID_LOG_ERROR, "Already running thread %x", thread_id);
     else {
-        jint rs = (*env)->GetJavaVM(env, &jvm);
+        jint rs = env->GetJavaVM(&jvm);
         if (rs != JNI_OK)
             log_android(ANDROID_LOG_ERROR, "GetJavaVM failed");
 
         // Get arguments
-        struct arguments *args = malloc(sizeof(struct arguments));
+        struct arguments *args = static_cast<arguments *>(malloc(sizeof(struct arguments)));
         // args->env = will be set in thread
-        args->instance = (*env)->NewGlobalRef(env, instance);
+        args->instance = env->NewGlobalRef(instance);
         args->tun = tun;
         args->fwd53 = fwd53;
         args->rcode = rcode;
@@ -104,7 +104,7 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1start(
 
 
         // Start native thread
-        int err = pthread_create(&thread_id, NULL, handle_events, (void *) args);
+        int err = pthread_create(&thread_id, nullptr, handle_events, (void *) args);
         if (err == 0)
             log_android(ANDROID_LOG_WARN, "Started thread %x", thread_id);
         else
@@ -113,10 +113,10 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1start(
 
     }
 
-    (*env)->ReleaseStringUTFChars(env, proxyIp, proxy_ip);
+    env->ReleaseStringUTFChars(proxyIp, proxy_ip);
 }
 
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_tun_proxy_service_Tun2HttpVpnService_jni_1stop(
         JNIEnv *env, jobject instance, jint tun) {
     pthread_t t = thread_id;
@@ -127,7 +127,7 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1stop(
             log_android(ANDROID_LOG_WARN, "Write pipe error %d: %s", errno, strerror(errno));
         else {
             log_android(ANDROID_LOG_WARN, "Join thread %x", t);
-            int err = pthread_join(t, NULL);
+            int err = pthread_join(t, nullptr);
             if (err != 0)
                 log_android(ANDROID_LOG_WARN, "pthread_join error %d: %s", err, strerror(err));
         }
@@ -139,13 +139,13 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1stop(
         log_android(ANDROID_LOG_WARN, "Not running thread %x", t);
 }
 
-JNIEXPORT jint JNICALL
+extern "C" JNIEXPORT jint JNICALL
 Java_tun_proxy_service_Tun2HttpVpnService_jni_1get_1mtu(JNIEnv *env, jobject instance) {
     return get_mtu();
 }
 
 
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_tun_proxy_service_Tun2HttpVpnService_jni_1done(JNIEnv *env, jobject instance) {
     log_android(ANDROID_LOG_INFO, "Done");
 
@@ -161,28 +161,28 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1done(JNIEnv *env, jobject instanc
 
 // JNI Util
 
-JNIEXPORT jstring JNICALL
+extern "C" JNIEXPORT jstring JNICALL
 Java_tun_utils_Util_jni_1getprop(JNIEnv *env, jclass type, jstring name_) {
-    const char *name = (*env)->GetStringUTFChars(env, name_, 0);
+    const char *name = env->GetStringUTFChars(name_, 0);
 
     char value[PROP_VALUE_MAX + 1] = "";
     __system_property_get(name, value);
 
-    (*env)->ReleaseStringUTFChars(env, name_, name);
+    env->ReleaseStringUTFChars(name_, name);
 
-    return (*env)->NewStringUTF(env, value);
+    return env->NewStringUTF( value);
 }
 
-static jmethodID midProtect = NULL;
+static jmethodID midProtect = nullptr;
 
 
 int protect_socket(const struct arguments *args, int socket) {
-    jclass cls = (*args->env)->GetObjectClass(args->env, args->instance);
-    if (midProtect == NULL)
+    jclass cls = args->env->GetObjectClass(args->instance);
+    if (midProtect == nullptr)
         midProtect = jniGetMethodID(args->env, cls, "protect", "(I)Z");
 
-    jboolean isProtected = (*args->env)->CallBooleanMethod(
-            args->env, args->instance, midProtect, socket);
+    jboolean isProtected = args->env->CallBooleanMethod(
+            args->instance, midProtect, socket);
     jniCheckException(args->env);
 
     if (!isProtected) {
@@ -190,22 +190,22 @@ int protect_socket(const struct arguments *args, int socket) {
         return -1;
     }
 
-    (*args->env)->DeleteLocalRef(args->env, cls);
+    args->env->DeleteLocalRef(cls);
 
     return 0;
 }
 
 
 jobject jniGlobalRef(JNIEnv *env, jobject cls) {
-    jobject gcls = (*env)->NewGlobalRef(env, cls);
-    if (gcls == NULL)
+    jobject gcls = env->NewGlobalRef(cls);
+    if (gcls == nullptr)
         log_android(ANDROID_LOG_ERROR, "Global ref failed (out of memory?)");
     return gcls;
 }
 
 jclass jniFindClass(JNIEnv *env, const char *name) {
-    jclass cls = (*env)->FindClass(env, name);
-    if (cls == NULL)
+    jclass cls = env->FindClass(name);
+    if (cls == nullptr)
         log_android(ANDROID_LOG_ERROR, "Class %s not found", name);
     else
         jniCheckException(env);
@@ -213,8 +213,8 @@ jclass jniFindClass(JNIEnv *env, const char *name) {
 }
 
 jmethodID jniGetMethodID(JNIEnv *env, jclass cls, const char *name, const char *signature) {
-    jmethodID method = (*env)->GetMethodID(env, cls, name, signature);
-    if (method == NULL) {
+    jmethodID method = env->GetMethodID(cls, name, signature);
+    if (method == nullptr) {
         log_android(ANDROID_LOG_ERROR, "Method %s %s not found", name, signature);
         jniCheckException(env);
     }
@@ -222,11 +222,11 @@ jmethodID jniGetMethodID(JNIEnv *env, jclass cls, const char *name, const char *
 }
 
 int jniCheckException(JNIEnv *env) {
-    jthrowable ex = (*env)->ExceptionOccurred(env);
+    jthrowable ex = env->ExceptionOccurred();
     if (ex) {
-        (*env)->ExceptionDescribe(env);
-        (*env)->ExceptionClear(env);
-        (*env)->DeleteLocalRef(env, ex);
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        env->DeleteLocalRef(ex);
         return 1;
     }
     return 0;
