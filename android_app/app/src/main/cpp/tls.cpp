@@ -1,8 +1,8 @@
 
 
-#include <stdio.h>
-#include <stdlib.h> /* malloc() */
-#include <string.h> /* strncpy() */
+#include <cstdio>
+#include <cstdlib> /* malloc() */
+#include <cstring> /* strncpy() */
 #include <sys/socket.h>
 #include <android/log.h>
 #include <tun2http.h>
@@ -94,13 +94,12 @@ void parse_tls_header(const char *data, size_t data_len, char *hostname)
     size_t pos = TLS_HEADER_LEN;
     size_t len;
 
-    log_android_hex(ANDROID_LOG_INFO, "TLS data: ", (unsigned char *) data, data_len);
     /*
      * Check that our TCP payload is at least large enough for a
      * TLS header
      */
     if (data_len < TLS_HEADER_LEN)
-        return;
+        goto error;
 
     /*
      * SSL 2.0 compatible Client Hello
@@ -110,18 +109,19 @@ void parse_tls_header(const char *data, size_t data_len, char *hostname)
      * See RFC5246 Appendix E.2
      */
     if (data[0] & 0x80 && data[2] == 1) {
-        return;
+        goto error;
     }
 
     tls_content_type = data[0];
     if (tls_content_type != TLS_HANDSHAKE_CONTENT_TYPE) {
+        // only handshake is interesting for SNI extension
         return;
     }
 
     tls_version_major = data[1];
     tls_version_minor = data[2];
     if (tls_version_major < 3) {
-        return;
+        goto error;
     }
 
     /* TLS record length */
@@ -130,14 +130,14 @@ void parse_tls_header(const char *data, size_t data_len, char *hostname)
     data_len = MIN(data_len, len);
 
     /* Check we received entire TLS record length */
-    if (data_len < len)
-        return;
-
+    // NOTE: if incomplete TCP data arrives, this breaks
+//    if (data_len < len)
+//        return;
     /* Handshake */
     if (pos + 1 > data_len)
-        return;
+        goto error;
     if (data[pos] != TLS_HANDSHAKE_TYPE_CLIENT_HELLO) {
-        return;
+        goto error;
     }
 
     /*
@@ -152,36 +152,41 @@ void parse_tls_header(const char *data, size_t data_len, char *hostname)
 
     /* Session ID */
     if (pos + 1 > data_len)
-        return;
+        goto error;
     len = (unsigned char)data[pos];
     pos += 1 + len;
 
     /* Cipher Suites */
     if (pos + 2 > data_len)
-        return;
+        goto error;
     len = ((unsigned char)data[pos] << 8) + (unsigned char)data[pos + 1];
     pos += 2 + len;
 
     /* Compression Methods */
     if (pos + 1 > data_len)
-        return;
+        goto error;
     len = (unsigned char)data[pos];
     pos += 1 + len;
 
     if (pos == data_len && tls_version_major == 3 &&
         tls_version_minor == 0) {
-        return;
+        goto error;
     }
 
     /* Extensions */
     if (pos + 2 > data_len)
-        return;
+        goto error;
     len = ((unsigned char)data[pos] << 8) + (unsigned char)data[pos + 1];
     pos += 2;
 
-    if (pos + len > data_len)
-        return;
-
+    // NOTE: if incomplete TCP data arrives, this breaks
+//    if (pos + len > data_len)
+//        return;
     parse_extensions(data + pos, len, hostname);
     log_android(ANDROID_LOG_INFO, "Server Name Indication: %s", hostname);
+    return;
+ error:
+    if (data_len > 0) {
+        log_android_hex(ANDROID_LOG_WARN, "TLS Server Name Indication not found: ", (unsigned char *) data, data_len);
+    }
 }

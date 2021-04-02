@@ -6,7 +6,7 @@ extern struct ng_session *ng_session;
 
 void clear_tcp_data(struct tcp_session *cur) {
     struct segment *s = cur->forward;
-    while (s != NULL) {
+    while (s != nullptr) {
         struct segment *p = s;
         s = s->next;
         free(p->data);
@@ -31,7 +31,7 @@ int get_tcp_timeout(const struct tcp_session *t, int sessions, int maxsessions) 
 
 int check_tcp_session(const struct arguments *args, struct ng_session *s,
                       int sessions, int maxsessions) {
-    time_t now = time(NULL);
+    time_t now = time(nullptr);
 
     char source[INET6_ADDRSTRLEN + 1];
     char dest[INET6_ADDRSTRLEN + 1];
@@ -71,7 +71,7 @@ int check_tcp_session(const struct arguments *args, struct ng_session *s,
             s->socket = -1;
         }
 
-        s->tcp.time = time(NULL);
+        s->tcp.time = time(nullptr);
         s->tcp.state = TCP_CLOSE;
     }
 
@@ -119,7 +119,7 @@ int monitor_tcp_session(const struct arguments *args, struct ng_session *s, int 
         }
 
         // Check for outgoing data
-        if (s->tcp.forward != NULL) {
+        if (s->tcp.forward != nullptr) {
             uint32_t buffer_size = (uint32_t) get_receive_buffer(s);
             if (s->tcp.forward->seq + s->tcp.forward->sent == s->tcp.remote_seq &&
                 s->tcp.forward->len - s->tcp.forward->sent < buffer_size)
@@ -220,7 +220,7 @@ void check_tcp_socket(const struct arguments *args,
 
     // Check socket error
     if (ev->events & EPOLLERR) {
-        s->tcp.time = time(NULL);
+        s->tcp.time = time(nullptr);
 
         int serr = 0;
         socklen_t optlen = sizeof(int);
@@ -235,6 +235,7 @@ void check_tcp_socket(const struct arguments *args,
         write_rst(args, &s->tcp);
 
         // Connection refused
+        // TODO: what for?
         if (0)
             if (err >= 0 && (serr == ECONNREFUSED || serr == EHOSTUNREACH)) {
                 struct icmp icmp;
@@ -274,14 +275,16 @@ void check_tcp_socket(const struct arguments *args,
                 } else {
                     if (s->tcp.connect_sent == TCP_CONNECT_SENT) {
                         buffer[bytes] = '\0';
-                            s->tcp.connect_sent = TCP_CONNECT_ESTABLISHED;
-                            while (recv(s->socket, buffer, sizeof(buffer), 0) > 0) {}
-                            s->tcp.state = TCP_SYN_RECV;
-                        } else {
+                        s->tcp.connect_sent = TCP_CONNECT_ESTABLISHED;
+                        while (recv(s->socket, buffer, sizeof(buffer), 0) > 0) {}
+                        s->tcp.state = TCP_SYN_RECV;
+                        if (strcmp(buffer, "HTTP/1.0 200") == 0 || strcmp(buffer, "HTTP/1.1 200") == 0) {
+                            log_android(ANDROID_LOG_ERROR, "SOCKS proxy returned error: %s", buffer);
                             write_rst(args, &s->tcp);
-                        }                        if (strcmp(buffer, "HTTP/1.0 200") == 0 || strcmp(buffer, "HTTP/1.1 200") == 0) {
-
                         }
+                    } else {
+                        write_rst(args, &s->tcp);
+                    }
                 }
             } else {
                 s->tcp.remote_seq++; // remote SYN
@@ -620,7 +623,7 @@ jboolean handle_tcp(const struct arguments *args,
             struct ng_session *s = (struct ng_session *)malloc(sizeof(struct ng_session));
             s->protocol = IPPROTO_TCP;
 
-            s->tcp.time = time(NULL);
+            s->tcp.time = time(nullptr);
             s->tcp.uid = uid;
             s->tcp.version = version;
             s->tcp.mss = mss;
@@ -718,17 +721,24 @@ jboolean handle_tcp(const struct arguments *args,
         if (rport == 443) {
             if (len > 0) {
                 strcpy(cur->tcp.hostname, hostname);
-            } else {
-                struct sockaddr_in addr4;
-                addr4.sin_family = AF_INET;
-                addr4.sin_addr.s_addr = (__be32) cur->tcp.daddr.ip4;
-                addr4.sin_port = cur->tcp.dest;
-                lookup_hostname(&addr4, hostname, 512, 1);
-                len = strlen(hostname);
-                if (len > 0) {
-                    strcpy(cur->tcp.hostname, hostname);
-                }
             }
+            // NOTE: this does not work reliablely, if the name cannot be resolved, the HTTP connect will be executed with just the IP address,
+            // which does not work with MITM generated certificates for the domain different from the IP address
+//            else {
+//                struct sockaddr_in addr4;
+//                addr4.sin_family = AF_INET;
+//                addr4.sin_addr.s_addr = (__be32) cur->tcp.daddr.ip4;
+//                addr4.sin_port = cur->tcp.dest;
+//                lookup_hostname(&addr4, hostname, 512, 1);
+//                len = strlen(hostname);
+//                if (len > 0) {
+//                    log_android(ANDROID_LOG_INFO, "HTTP hostname: %s", hostname);
+//                    strcpy(cur->tcp.hostname, hostname);
+//                }
+//                else {
+//                    log_android(ANDROID_LOG_INFO, "HTTP hostname: %x", addr4.sin_addr.s_addr);
+//                }
+//            }
             if (cur->tcp.connect_sent == TCP_CONNECT_NOT_SENT) {
                 if (len > 0) {
                     char buffer[512];

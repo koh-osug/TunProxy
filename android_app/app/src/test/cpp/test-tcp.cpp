@@ -62,7 +62,7 @@ TEST(TCP, TLS_SNI_2) {
     memset(hostname, 0, sizeof(hostname));
     ssize_t length = from_hex(hex, data);
     parse_tls_header((const char *)data, length, hostname);
-//    EXPECT_STREQ("weather.opera-api.com", hostname);
+    EXPECT_STREQ("cdn.prod.www.spiegel.de", hostname);
     printf("Parsed Hostname: %s\n", hostname);
 }
 
@@ -88,6 +88,20 @@ TEST(TCP, TLS_SNI_4) {
     EXPECT_STREQ("update.googleapis.com", hostname);
     printf("Parsed Hostname: %s\n", hostname);
 }
+
+
+TEST(TCP, TLS_SNI_5) {
+    const char *hex = "1603010200010001FC0303FDF5910FCF4811E4B6060730F2021A6F4FDB6BBC2BBCF91F3B2F6F0DF3ACFAC5207082DC042309B5C2B96727EB5FC5C94F1CF3D9DDBB9BA0B7080689A4BC1047A6001E130113021303C02BC02CCCA9C02FC030CCA8C013C014009C009D002F0035010001950000001900170000146E6577732D61662E666565646E6577732E636F6D00170000FF01000100000A00080006001D00170018000B00020100002300000010000E000C02683208687474702F312E31000500050100000000000D00140012040308040401050308050501080606010201003300260024001D0020EFB5CB19593793C9EA333617FEB191D2F8D98E92AEA3FA";
+    char data[1024];
+    char hostname[512];
+    memset(hostname, 0, sizeof(hostname));
+    ssize_t length = from_hex(hex, data);
+    parse_tls_header((const char *)data, length, hostname);
+    EXPECT_STREQ("news-af.feednews.com", hostname);
+    printf("Parsed Hostname: %s\n", hostname);
+}
+
+
 
 
 
