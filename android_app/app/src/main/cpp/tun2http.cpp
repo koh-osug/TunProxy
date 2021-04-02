@@ -17,21 +17,21 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
 
     JNIEnv *env;
     if (vm->GetEnv((void **) &env, JNI_VERSION_1_6) != JNI_OK) {
-        log_android(ANDROID_LOG_INFO, "JNI load GetEnv failed");
+        log_android(ANDROID_LOG_ERROR, "JNI load GetEnv failed");
         return -1;
     }
 
     // Raise file number limit to maximum
     struct rlimit rlim;
     if (getrlimit(RLIMIT_NOFILE, &rlim))
-        log_android(ANDROID_LOG_WARN, "getrlimit error %d: %s", errno, strerror(errno));
+        log_android(ANDROID_LOG_DEBUG, "getrlimit error %d: %s", errno, strerror(errno));
     else {
         rlim_t soft = rlim.rlim_cur;
         rlim.rlim_cur = rlim.rlim_max;
         if (setrlimit(RLIMIT_NOFILE, &rlim))
-            log_android(ANDROID_LOG_WARN, "setrlimit error %d: %s", errno, strerror(errno));
+            log_android(ANDROID_LOG_DEBUG, "setrlimit error %d: %s", errno, strerror(errno));
         else
-            log_android(ANDROID_LOG_WARN, "raised file limit from %d to %d", soft, rlim.rlim_cur);
+            log_android(ANDROID_LOG_VERBOSE, "raised file limit from %d to %d", soft, rlim.rlim_cur);
     }
 
     return JNI_VERSION_1_6;
@@ -42,7 +42,7 @@ void JNI_OnUnload(JavaVM *vm, void *reserved) {
 
     JNIEnv *env;
     if (vm->GetEnv((void **) &env, JNI_VERSION_1_6) != JNI_OK)
-        log_android(ANDROID_LOG_INFO, "JNI load GetEnv failed");
+        log_android(ANDROID_LOG_ERROR, "JNI load GetEnv failed");
 }
 
 // JNI ServiceSinkhole
@@ -106,7 +106,7 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1start(
         // Start native thread
         int err = pthread_create(&thread_id, nullptr, handle_events, (void *) args);
         if (err == 0)
-            log_android(ANDROID_LOG_WARN, "Started thread %x", thread_id);
+            log_android(ANDROID_LOG_DEBUG, "Started thread %x", thread_id);
         else
             log_android(ANDROID_LOG_ERROR, "pthread_create error %d: %s", err, strerror(err));
 
@@ -120,13 +120,13 @@ extern "C" JNIEXPORT void JNICALL
 Java_tun_proxy_service_Tun2HttpVpnService_jni_1stop(
         JNIEnv *env, jobject instance, jint tun) {
     pthread_t t = thread_id;
-    log_android(ANDROID_LOG_WARN, "Stop tun %d  thread %x", tun, t);
+    log_android(ANDROID_LOG_DEBUG, "Stop tun %d  thread %x", tun, t);
     if (t && pthread_kill(t, 0) == 0) {
-        log_android(ANDROID_LOG_WARN, "Write pipe thread %x", t);
+        log_android(ANDROID_LOG_VERBOSE, "Write pipe thread %x", t);
         if (write(pipefds[1], "x", 1) < 0)
             log_android(ANDROID_LOG_WARN, "Write pipe error %d: %s", errno, strerror(errno));
         else {
-            log_android(ANDROID_LOG_WARN, "Join thread %x", t);
+            log_android(ANDROID_LOG_VERBOSE, "Join thread %x", t);
             int err = pthread_join(t, nullptr);
             if (err != 0)
                 log_android(ANDROID_LOG_WARN, "pthread_join error %d: %s", err, strerror(err));
@@ -134,9 +134,9 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1stop(
 
         clear();
 
-        log_android(ANDROID_LOG_WARN, "Stopped thread %x", t);
+        log_android(ANDROID_LOG_DEBUG, "Stopped thread %x", t);
     } else
-        log_android(ANDROID_LOG_WARN, "Not running thread %x", t);
+        log_android(ANDROID_LOG_VERBOSE, "Not running thread %x", t);
 }
 
 extern "C" JNIEXPORT jint JNICALL

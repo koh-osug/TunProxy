@@ -30,7 +30,7 @@ int check_udp_session(const struct arguments *args, struct ng_session *s,
     // Check session timeout
     int timeout = get_udp_timeout(&s->udp, sessions, maxsessions);
     if (s->udp.state == UDP_ACTIVE && s->udp.time + timeout < now) {
-        log_android(ANDROID_LOG_WARN, "UDP idle %d/%d sec state %d from %s/%u to %s/%u",
+        log_android(ANDROID_LOG_VERBOSE, "UDP idle %d/%d sec state %d from %s/%u to %s/%u",
                     now - s->udp.time, timeout, s->udp.state,
                     source, ntohs(s->udp.source), dest, ntohs(s->udp.dest));
         s->udp.state = UDP_FINISHING;
@@ -38,11 +38,11 @@ int check_udp_session(const struct arguments *args, struct ng_session *s,
 
     // Check finished sessions
     if (s->udp.state == UDP_FINISHING) {
-        log_android(ANDROID_LOG_INFO, "UDP close from %s/%u to %s/%u socket %d",
+        log_android(ANDROID_LOG_VERBOSE, "UDP close from %s/%u to %s/%u socket %d",
                     source, ntohs(s->udp.source), dest, ntohs(s->udp.dest), s->socket);
 
         if (close(s->socket))
-            log_android(ANDROID_LOG_ERROR, "UDP close %d error %d: %s",
+            log_android(ANDROID_LOG_WARN, "UDP close %d error %d: %s",
                         s->socket, errno, strerror(errno));
         s->socket = -1;
 
@@ -105,7 +105,7 @@ void check_udp_socket(const struct arguments *args, const struct epoll_event *ev
                     inet_ntop(AF_INET, &s->udp.daddr.ip4, dest, sizeof(dest));
                 else
                     inet_ntop(AF_INET6, &s->udp.daddr.ip6, dest, sizeof(dest));
-                log_android(ANDROID_LOG_INFO, "UDP recv bytes %d from %s/%u for tun",
+                log_android(ANDROID_LOG_DEBUG, "UDP recv bytes %d from %s/%u for tun",
                             bytes, dest, ntohs(s->udp.dest));
 
                 s->udp.received += bytes;
@@ -173,7 +173,7 @@ void block_udp(const struct arguments *args,
         inet_ntop(AF_INET6, &ip6->ip6_dst, dest, sizeof(dest));
     }
 
-    log_android(ANDROID_LOG_INFO, "UDP blocked session from %s/%u to %s/%u",
+    log_android(ANDROID_LOG_DEBUG, "UDP blocked session from %s/%u to %s/%u",
                 source, ntohs(udphdr->source), dest, ntohs(udphdr->dest));
 
     // Register session
@@ -237,7 +237,7 @@ jboolean handle_udp(const struct arguments *args,
     }
 
     if (cur != nullptr && cur->udp.state != UDP_ACTIVE) {
-        log_android(ANDROID_LOG_INFO, "UDP ignore session from %s/%u to %s/%u state %d",
+        log_android(ANDROID_LOG_DEBUG, "UDP ignore session from %s/%u to %s/%u state %d",
                     source, ntohs(udphdr->source), dest, ntohs(udphdr->dest), cur->udp.state);
         return 0;
     }
@@ -331,7 +331,7 @@ jboolean handle_udp(const struct arguments *args,
             return 1;
     }
 
-    log_android(ANDROID_LOG_INFO, "UDP forward from tun %s/%u to %s/%u data %d",
+    log_android(ANDROID_LOG_DEBUG, "UDP forward from tun %s/%u to %s/%u data %d",
                 source, ntohs(udphdr->source), dest, ntohs(udphdr->dest), datalen);
 
     cur->udp.time = time(nullptr);
@@ -389,7 +389,7 @@ int open_udp_socket(const struct arguments *args,
     if (cur->version == 4) {
         uint32_t broadcast4 = INADDR_BROADCAST;
         if (memcmp(&cur->daddr.ip4, &broadcast4, sizeof(broadcast4)) == 0) {
-            log_android(ANDROID_LOG_WARN, "UDP4 broadcast");
+            log_android(ANDROID_LOG_VERBOSE, "UDP4 broadcast");
             int on = 1;
             if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on)))
                 log_android(ANDROID_LOG_ERROR, "UDP setsockopt SO_BROADCAST error %d: %s",
@@ -398,7 +398,7 @@ int open_udp_socket(const struct arguments *args,
     } else {
         // http://man7.org/linux/man-pages/man7/ipv6.7.html
         if (*((uint8_t *) &cur->daddr.ip6) == 0xFF) {
-            log_android(ANDROID_LOG_WARN, "UDP6 broadcast");
+            log_android(ANDROID_LOG_VERBOSE, "UDP6 broadcast");
 
             int loop = 1; // true
             if (setsockopt(sock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &loop, sizeof(loop)))

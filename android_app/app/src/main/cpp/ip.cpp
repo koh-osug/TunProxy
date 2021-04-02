@@ -43,7 +43,7 @@ int check_tun(const struct arguments *args,
         } else if (length > 0) {
             if (length > max_tun_msg) {
                 max_tun_msg = length;
-                log_android(ANDROID_LOG_WARN, "Maximum tun msg length %d", max_tun_msg);
+                log_android(ANDROID_LOG_DEBUG, "Maximum tun msg length %d", max_tun_msg);
             }
 
             // Handle IP from tun
@@ -100,7 +100,7 @@ void handle_ip(const struct arguments *args,
     uint8_t version = (*pkt) >> 4;
     if (version == 4) {
         if (length < sizeof(struct iphdr)) {
-            log_android(ANDROID_LOG_WARN, "IP4 packet too short length %d", length);
+            log_android(ANDROID_LOG_ERROR, "IP4 packet too short length %d", length);
             return;
         }
 
@@ -125,15 +125,13 @@ void handle_ip(const struct arguments *args,
             return;
         }
 
-        if (loglevel < ANDROID_LOG_WARN) {
-            if (!calc_checksum(0, (uint8_t *) ip4hdr, sizeof(struct iphdr))) {
-                log_android(ANDROID_LOG_ERROR, "Invalid IP checksum");
-                return;
-            }
+        if (!calc_checksum(0, (uint8_t *) ip4hdr, sizeof(struct iphdr))) {
+            log_android(ANDROID_LOG_ERROR, "Invalid IP checksum");
+            return;
         }
     } else if (version == 6) {
         if (length < sizeof(struct ip6_hdr)) {
-            log_android(ANDROID_LOG_WARN, "IP6 packet too short length %d", length);
+            log_android(ANDROID_LOG_ERROR, "IP6 packet too short length %d", length);
             return;
         }
 
@@ -143,12 +141,12 @@ void handle_ip(const struct arguments *args,
         uint16_t off = 0;
         protocol = ip6hdr->ip6_nxt;
         if (!is_upper_layer(protocol)) {
-            log_android(ANDROID_LOG_WARN, "IP6 extension %d", protocol);
+            log_android(ANDROID_LOG_VERBOSE, "IP6 extension %d", protocol);
             off = sizeof(struct ip6_hdr);
             struct ip6_ext *ext = (struct ip6_ext *) (pkt + off);
             while (is_lower_layer(ext->ip6e_nxt) && !is_upper_layer(protocol)) {
                 protocol = ext->ip6e_nxt;
-                log_android(ANDROID_LOG_WARN, "IP6 extension %d", protocol);
+                log_android(ANDROID_LOG_VERBOSE, "IP6 extension %d", protocol);
 
                 off += (8 + ext->ip6e_len);
                 ext = (struct ip6_ext *) (pkt + off);
@@ -156,7 +154,7 @@ void handle_ip(const struct arguments *args,
             if (!is_upper_layer(protocol)) {
                 off = 0;
                 protocol = ip6hdr->ip6_nxt;
-                log_android(ANDROID_LOG_WARN, "IP6 final extension %d", protocol);
+                log_android(ANDROID_LOG_VERBOSE, "IP6 final extension %d", protocol);
             }
         }
 
@@ -180,7 +178,7 @@ void handle_ip(const struct arguments *args,
     uint16_t dport = 0;
     if (protocol == IPPROTO_ICMP || protocol == IPPROTO_ICMPV6) {
         if (length - (payload - pkt) < sizeof(struct icmp)) {
-            log_android(ANDROID_LOG_WARN, "ICMP packet too short");
+            log_android(ANDROID_LOG_DEBUG, "ICMP packet too short");
             return;
         }
 
@@ -192,7 +190,7 @@ void handle_ip(const struct arguments *args,
 
     } else if (protocol == IPPROTO_UDP) {
         if (length - (payload - pkt) < sizeof(struct udphdr)) {
-            log_android(ANDROID_LOG_WARN, "UDP packet too short");
+            log_android(ANDROID_LOG_DEBUG, "UDP packet too short");
             return;
         }
 
@@ -204,7 +202,7 @@ void handle_ip(const struct arguments *args,
         // TODO checksum (IPv6)
     } else if (protocol == IPPROTO_TCP) {
         if (length - (payload - pkt) < sizeof(struct tcphdr)) {
-            log_android(ANDROID_LOG_WARN, "TCP packet too short");
+            log_android(ANDROID_LOG_DEBUG, "TCP packet too short");
             return;
         }
 
@@ -271,7 +269,7 @@ jint get_uid(const int version, const int protocol,
 
     char dest[INET6_ADDRSTRLEN + 1];
     inet_ntop(version == 4 ? AF_INET : AF_INET6, daddr, dest, sizeof(dest));
-    log_android(ANDROID_LOG_INFO, "get uid v%d p%d %u > %s/%u",
+    log_android(ANDROID_LOG_VERBOSE, "get uid v%d p%d %u > %s/%u",
                 version, protocol, sport, dest, dport);
 
     // Check IPv6 table first
@@ -288,7 +286,7 @@ jint get_uid(const int version, const int protocol,
         uid = get_uid_sub(version, protocol, saddr, sport, daddr, dport);
 
     if (uid < 0)
-        log_android(ANDROID_LOG_ERROR, "uid v%d p%d %u > %s/%u not found",
+        log_android(ANDROID_LOG_DEBUG, "uid v%d p%d %u > %s/%u not found",
                     version, protocol, sport, dest, dport);
 
     return uid;
@@ -332,7 +330,7 @@ jint get_uid_sub(const int version, const int protocol,
     // Open proc file
     FILE *fd = fopen(fn, "r");
     if (fd == nullptr) {
-        log_android(ANDROID_LOG_ERROR, "fopen %s error %d: %s", fn, errno, strerror(errno));
+        log_android(ANDROID_LOG_DEBUG, "fopen %s error %d: %s", fn, errno, strerror(errno));
         return uid;
     }
 
@@ -340,7 +338,7 @@ jint get_uid_sub(const int version, const int protocol,
     jint u;
     int i = 0;
     *line = 0;
-    while (fgets(line, sizeof(line), fd) != NULL) {
+    while (fgets(line, sizeof(line), fd) != nullptr) {
         if (i++) {
             *hex = 0;
             _sport = -1;

@@ -29,7 +29,7 @@ void clear() {
 
 void *handle_events(void *a) {
     struct arguments *args = (struct arguments *) a;
-    log_android(ANDROID_LOG_WARN, "Start events tun=%d thread %x", args->tun, thread_id);
+    log_android(ANDROID_LOG_DEBUG, "Start events tun=%d thread %x", args->tun, thread_id);
 
     // Attach to Java
     JNIEnv *env;
@@ -44,9 +44,9 @@ void *handle_events(void *a) {
     int maxsessions = 1024;
     struct rlimit rlim;
     if (getrlimit(RLIMIT_NOFILE, &rlim))
-        log_android(ANDROID_LOG_WARN, "getrlimit error %d: %s", errno, strerror(errno));
+        log_android(ANDROID_LOG_DEBUG, "getrlimit error %d: %s", errno, strerror(errno));
     else
-        log_android(ANDROID_LOG_WARN, "getrlimit soft %d hard %d max sessions %d",
+        log_android(ANDROID_LOG_VERBOSE, "getrlimit soft %d hard %d max sessions %d",
                     rlim.rlim_cur, rlim.rlim_max, maxsessions);
     maxsessions = (int) (rlim.rlim_cur * SESSION_LIMIT / 100);
     if (maxsessions > 1000)
@@ -87,7 +87,7 @@ void *handle_events(void *a) {
     // Loop
     long long last_check = 0;
     while (!stopping) {
-        log_android(ANDROID_LOG_DEBUG, "Loop thread %x", thread_id);
+        log_android(ANDROID_LOG_VERBOSE, "Loop thread %x", thread_id);
 
         int recheck = 0;
         int timeout = EPOLL_TIMEOUT;
@@ -208,10 +208,10 @@ void *handle_events(void *a) {
                     stopping = 1;
                     uint8_t buffer[1];
                     if (read(pipefds[0], buffer, 1) < 0)
-                        log_android(ANDROID_LOG_WARN, "Read pipe error %d: %s",
+                        log_android(ANDROID_LOG_ERROR, "Read pipe error %d: %s",
                                     errno, strerror(errno));
                     else
-                        log_android(ANDROID_LOG_WARN, "Read pipe");
+                        log_android(ANDROID_LOG_VERBOSE, "Read pipe");
                     break;
 
                 } else if (ev[i].data.ptr == nullptr) {
@@ -278,7 +278,7 @@ void *handle_events(void *a) {
     // Cleanup
     free(args);
 
-    log_android(ANDROID_LOG_WARN, "Stopped events tun=%d thread %x", args->tun, thread_id);
+    log_android(ANDROID_LOG_VERBOSE, "Stopped events tun=%d thread %x", args->tun, thread_id);
     thread_id = 0;
     return nullptr;
 }
@@ -302,7 +302,7 @@ void check_allowed(const struct arguments *args) {
 
 
                 s->icmp.stop = 1;
-                log_android(ANDROID_LOG_WARN, "ICMP terminate %d uid %d",
+                log_android(ANDROID_LOG_VERBOSE, "ICMP terminate %d uid %d",
                             s->socket, s->icmp.uid);
             }
 
@@ -317,10 +317,10 @@ void check_allowed(const struct arguments *args) {
                 }
 
                 s->udp.state = UDP_FINISHING;
-                log_android(ANDROID_LOG_WARN, "UDP terminate session socket %d uid %d",
+                log_android(ANDROID_LOG_VERBOSE, "UDP terminate session socket %d uid %d",
                             s->socket, s->udp.uid);
             } else if (s->udp.state == UDP_BLOCKED) {
-                log_android(ANDROID_LOG_WARN, "UDP remove blocked session uid %d", s->udp.uid);
+                log_android(ANDROID_LOG_VERBOSE, "UDP remove blocked session uid %d", s->udp.uid);
 
                 if (l == nullptr)
                     ng_session = s->next;
@@ -344,7 +344,7 @@ void check_allowed(const struct arguments *args) {
                 }
 
                 write_rst(args, &s->tcp);
-                log_android(ANDROID_LOG_WARN, "TCP terminate socket %d uid %d",
+                log_android(ANDROID_LOG_DEBUG, "TCP terminate socket %d uid %d",
                             s->socket, s->tcp.uid);
             }
 

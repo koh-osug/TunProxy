@@ -12,7 +12,8 @@ if (${ENABLE_CPP_TESTS} MATCHES "true")
 
     add_executable(test-tcp ${TEST_SRC_DIR}/test-tcp.cpp
             ${PROJECT_SOURCE_DIR}/src/main/cpp/tls.cpp
-            ${PROJECT_SOURCE_DIR}/src/main/cpp/util.cpp)
+            ${PROJECT_SOURCE_DIR}/src/main/cpp/util.cpp
+            ${PROJECT_SOURCE_DIR}/src/main/cpp/tun2http.cpp)
 
     find_library(log-lib log)
 

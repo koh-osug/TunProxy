@@ -183,7 +183,7 @@ void parse_tls_header(const char *data, size_t data_len, char *hostname)
 //    if (pos + len > data_len)
 //        return;
     parse_extensions(data + pos, len, hostname);
-    log_android(ANDROID_LOG_INFO, "Server Name Indication: %s", hostname);
+    log_android(ANDROID_LOG_DEBUG, "Server Name Indication: %s", hostname);
     return;
  error:
     if (data_len > 0) {

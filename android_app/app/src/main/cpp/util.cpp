@@ -2,7 +2,7 @@
 
 #include "tun2http.h"
 #include <android/log.h>
-#include <stdarg.h>
+#include <cstdarg>
 
 extern int loglevel;
 
@@ -46,35 +46,40 @@ int sdk_int(JNIEnv *env) {
 }
 
 void log_android(int prio, const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    __android_log_vprint(prio, "TunProxy", fmt, args);
-    va_end(args);
+    if (prio >= loglevel) {
+        va_list args;
+        va_start(args, fmt);
+        __android_log_vprint(prio, "TunProxy", fmt, args);
+        va_end(args);
+    }
 }
 
 void log_android_hex(int prio, const char *msg, unsigned char *buffer, int bufferLength) {
-    char *bufferMsg;
-    int i;
-    // each hex string needs the double size + termination
-    bufferMsg = (char *) malloc(bufferLength * sizeof(char) * 2 + sizeof(char));
-    // allocation did not succeed
-    if (bufferMsg == NULL) {
-        log_android(ANDROID_LOG_ERROR, "%sLOG ERROR: Could not allocate log buffer.", msg);
-        return;
-    }
-    for (i = 0; i < bufferLength; i++) {
-        snprintf(bufferMsg + (i * 2), (bufferLength - i) * sizeof(char) * 2 + sizeof(char), "%02X",
-                 (buffer[i] & 0x00FF));
-    }
-    bufferMsg[i] = '\0';
-    // print msg or not
-    if ((msg == NULL) || (strlen(msg) == 0)) {
-        log_android(prio, "%s", bufferMsg);
-    } else {
-        log_android(prio, "%s%s", msg, bufferMsg);
-    }
-    if (bufferMsg) {
-        free(bufferMsg);
+    if (prio >= loglevel) {
+        char *bufferMsg;
+        int i;
+        // each hex string needs the double size + termination
+        bufferMsg = (char *) malloc(bufferLength * sizeof(char) * 2 + sizeof(char));
+        // allocation did not succeed
+        if (bufferMsg == nullptr) {
+            log_android(ANDROID_LOG_ERROR, "%sLOG ERROR: Could not allocate log buffer.", msg);
+            return;
+        }
+        for (i = 0; i < bufferLength; i++) {
+            snprintf(bufferMsg + (i * 2), (bufferLength - i) * sizeof(char) * 2 + sizeof(char),
+                     "%02X",
+                     (buffer[i] & 0x00FF));
+        }
+        bufferMsg[i] = '\0';
+        // print msg or not
+        if ((msg == nullptr) || (strlen(msg) == 0)) {
+            log_android(prio, "%s", bufferMsg);
+        } else {
+            log_android(prio, "%s%s", msg, bufferMsg);
+        }
+        if (bufferMsg) {
+            free(bufferMsg);
+        }
     }
 }
 

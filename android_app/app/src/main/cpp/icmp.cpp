@@ -15,7 +15,7 @@ int get_icmp_timeout(const struct icmp_session *u, int sessions, int maxsessions
 
 int check_icmp_session(const struct arguments *args, struct ng_session *s,
                        int sessions, int maxsessions) {
-    time_t now = time(NULL);
+    time_t now = time(nullptr);
 
     int timeout = get_icmp_timeout(&s->icmp, sessions, maxsessions);
     if (s->icmp.stop || s->icmp.time + timeout < now) {
@@ -29,7 +29,7 @@ int check_icmp_session(const struct arguments *args, struct ng_session *s,
             inet_ntop(AF_INET6, &s->icmp.saddr.ip6, source, sizeof(source));
             inet_ntop(AF_INET6, &s->icmp.daddr.ip6, dest, sizeof(dest));
         }
-        log_android(ANDROID_LOG_WARN, "ICMP idle %d/%d sec stop %d from %s to %s",
+        log_android(ANDROID_LOG_DEBUG, "ICMP idle %d/%d sec stop %d from %s to %s",
                     now - s->icmp.time, timeout, s->icmp.stop, dest, source);
 
         if (close(s->socket))
@@ -48,7 +48,7 @@ void check_icmp_socket(const struct arguments *args, const struct epoll_event *e
 
     // Check socket error
     if (ev->events & EPOLLERR) {
-        s->icmp.time = time(NULL);
+        s->icmp.time = time(nullptr);
 
         int serr = 0;
         socklen_t optlen = sizeof(int);
@@ -72,14 +72,14 @@ void check_icmp_socket(const struct arguments *args, const struct epoll_event *e
             ssize_t bytes = recv(s->socket, buffer, blen, 0);
             if (bytes < 0) {
                 // Socket error
-                log_android(ANDROID_LOG_WARN, "ICMP recv error %d: %s",
+                log_android(ANDROID_LOG_ERROR, "ICMP recv error %d: %s",
                             errno, strerror(errno));
 
                 if (errno != EINTR && errno != EAGAIN)
                     s->icmp.stop = 1;
             }
             else if (bytes == 0) {
-                log_android(ANDROID_LOG_WARN, "ICMP recv eof");
+                log_android(ANDROID_LOG_ERROR, "ICMP recv eof");
                 s->icmp.stop = 1;
 
             }
@@ -96,7 +96,7 @@ void check_icmp_socket(const struct arguments *args, const struct epoll_event *e
                 // some bits seems to be set extra
                 struct icmp *icmp = (struct icmp *) buffer;
                 log_android(
-                        s->icmp.id == icmp->icmp_id ? ANDROID_LOG_INFO : ANDROID_LOG_WARN,
+                        s->icmp.id == icmp->icmp_id ? ANDROID_LOG_DEBUG : ANDROID_LOG_WARN,
                         "ICMP recv bytes %d from %s for tun type %d code %d id %x/%x seq %d",
                         bytes, dest,
                         icmp->icmp_type, icmp->icmp_code,
@@ -152,7 +152,7 @@ jboolean handle_icmp(const struct arguments *args,
     }
 
     if (icmp->icmp_type != ICMP_ECHO) {
-        log_android(ANDROID_LOG_WARN, "ICMP type %d code %d from %s to %s not supported",
+        log_android(ANDROID_LOG_DEBUG, "ICMP type %d code %d from %s to %s not supported",
                     icmp->icmp_type, icmp->icmp_code, source, dest);
         return 0;
     }
@@ -233,7 +233,7 @@ jboolean handle_icmp(const struct arguments *args,
     icmp->icmp_cksum = 0;
     icmp->icmp_cksum = ~calc_checksum(csum, (uint8_t *) icmp, icmplen);
 
-    log_android(ANDROID_LOG_INFO,
+    log_android(ANDROID_LOG_DEBUG,
                 "ICMP forward from tun %s to %s type %d code %d id %x seq %d data %d",
                 source, dest,
                 icmp->icmp_type, icmp->icmp_code, icmp->icmp_id, icmp->icmp_seq, icmplen);
@@ -337,7 +337,7 @@ ssize_t write_icmp(const struct arguments *args, const struct icmp_session *cur,
               cur->version == 4 ? (void *)&cur->daddr.ip4 : (void *)&cur->daddr.ip6, dest, sizeof(dest));
 
     // Send raw ICMP message
-    log_android(ANDROID_LOG_WARN,
+    log_android(ANDROID_LOG_DEBUG,
                 "ICMP sending to tun %d from %s to %s data %u type %d code %d id %x seq %d",
                 args->tun, dest, source, datalen,
                 icmp->icmp_type, icmp->icmp_code, icmp->icmp_id, icmp->icmp_seq);

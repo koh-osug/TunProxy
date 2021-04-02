@@ -12,7 +12,7 @@ int32_t get_qname(const uint8_t *data, const size_t datalen, uint16_t off, char 
         if (len & 0xC0) {
             ptr = (uint16_t) ((len & 0x3F) * 256 + *(data + ptr + 1));
             len = *(data + ptr);
-            log_android(ANDROID_LOG_DEBUG, "DNS qname compression ptr %d len %d", ptr, len);
+            log_android(ANDROID_LOG_VERBOSE, "DNS qname compression ptr %d len %d", ptr, len);
             if (!c) {
                 c = 1;
                 off += 2;
@@ -45,7 +45,7 @@ int32_t get_qname(const uint8_t *data, const size_t datalen, uint16_t off, char 
 void parse_dns_response(const struct arguments *args, const struct udp_session *u,
                         const uint8_t *data, size_t *datalen) {
     if (*datalen < sizeof(struct dns_header) + 1) {
-        log_android(ANDROID_LOG_WARN, "DNS response length %d", *datalen);
+        log_android(ANDROID_LOG_VERBOSE, "DNS response length %d", *datalen);
         return;
     }
 
@@ -55,7 +55,7 @@ void parse_dns_response(const struct arguments *args, const struct udp_session *
     int qcount = ntohs(dns->q_count);
     int acount = ntohs(dns->ans_count);
     if (dns->qr == 1 && dns->opcode == 0 && qcount > 0 && acount > 0) {
-        log_android(ANDROID_LOG_DEBUG, "DNS response qcount %d acount %d", qcount, acount);
+        log_android(ANDROID_LOG_VERBOSE, "DNS response qcount %d acount %d", qcount, acount);
         if (qcount > 1)
             log_android(ANDROID_LOG_WARN, "DNS response qcount %d acount %d", qcount, acount);
 
@@ -75,7 +75,7 @@ void parse_dns_response(const struct arguments *args, const struct udp_session *
                     strcpy(qname, name);
                     qtype = ntohs(*((uint16_t *) (data + off)));
                     qclass = ntohs(*((uint16_t *) (data + off + 2)));
-                    log_android(ANDROID_LOG_DEBUG,
+                    log_android(ANDROID_LOG_VERBOSE,
                                 "DNS question %d qtype %d qclass %d qname %s",
                                 q, qtype, qclass, qname);
                 }
@@ -139,7 +139,7 @@ int get_dns_query(const struct arguments *args, const struct udp_session *u,
                   const uint8_t *data, const size_t datalen,
                   uint16_t *qtype, uint16_t *qclass, char *qname) {
     if (datalen < sizeof(struct dns_header) + 1) {
-        log_android(ANDROID_LOG_WARN, "DNS query length %d", datalen);
+        log_android(ANDROID_LOG_VERBOSE, "DNS query length %d", datalen);
         return -1;
     }
 
@@ -149,7 +149,7 @@ int get_dns_query(const struct arguments *args, const struct udp_session *u,
     int qcount = ntohs(dns->q_count);
     if (dns->qr == 0 && dns->opcode == 0 && qcount > 0) {
         if (qcount > 1)
-            log_android(ANDROID_LOG_WARN, "DNS query qcount %d", qcount);
+            log_android(ANDROID_LOG_VERBOSE, "DNS query qcount %d", qcount);
 
         // http://tools.ietf.org/html/rfc1035
         int off = get_qname(data, datalen, sizeof(struct dns_header), qname);
