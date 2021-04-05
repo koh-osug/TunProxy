@@ -455,51 +455,6 @@ void check_tcp_socket(const struct arguments *args,
         log_android(ANDROID_LOG_DEBUG, "%s new state", session);
 }
 
-//#define DNS_LOOKUPS 1
-//#define USELESS_DNS_LOOKUPS 1
-static void lookup_hostname(struct sockaddr_in *addr, char *hostname, int hostlen, int needed) {
-#ifdef DNS_LOOKUPS
-    struct hostent	*host;
-
-    if (needed)
-    {
-        if ((host = gethostbyaddr((char *)&addr->sin_addr,
-                                  sizeof(addr->sin_addr), AF_INET)) != NULL)
-        {
-            strncpy(hostname, host->h_name, hostlen);
-            hostname[hostlen - 1] = '\0';
-        }
-        else
-        {
-            strncpy(hostname, inet_ntoa(addr->sin_addr), hostlen);
-            hostname[hostlen - 1] = '\0';
-        }
-    }
-    else
-    {
-# ifdef USELESS_DNS_LOOKUPS
-        if ((host = gethostbyaddr((char *)&addr->sin_addr,
-                                  sizeof(addr->sin_addr), AF_INET)) != NULL)
-        {
-            strncpy(hostname, host->h_name, hostlen);
-            hostname[hostlen - 1] = '\0';
-        }
-        else
-        {
-            strncpy(hostname, inet_ntoa(addr->sin_addr), hostlen);
-            hostname[hostlen - 1] = '\0';
-        }
-# else
-        strncpy(hostname, inet_ntoa(addr->sin_addr), hostlen);
-        hostname[hostlen - 1] = '\0';
-# endif
-    }
-#else
-    strncpy(hostname, inet_ntoa(addr->sin_addr), hostlen);
-    hostname[hostlen - 1] = '\0';
-#endif
-}
-
 
 jboolean handle_tcp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
@@ -722,23 +677,6 @@ jboolean handle_tcp(const struct arguments *args,
             if (len > 0) {
                 strcpy(cur->tcp.hostname, hostname);
             }
-            // NOTE: this does not work reliablely, if the name cannot be resolved, the HTTP connect will be executed with just the IP address,
-            // which does not work with MITM generated certificates for the domain different from the IP address
-//            else {
-//                struct sockaddr_in addr4;
-//                addr4.sin_family = AF_INET;
-//                addr4.sin_addr.s_addr = (__be32) cur->tcp.daddr.ip4;
-//                addr4.sin_port = cur->tcp.dest;
-//                lookup_hostname(&addr4, hostname, 512, 1);
-//                len = strlen(hostname);
-//                if (len > 0) {
-//                    log_android(ANDROID_LOG_INFO, "HTTP hostname: %s", hostname);
-//                    strcpy(cur->tcp.hostname, hostname);
-//                }
-//                else {
-//                    log_android(ANDROID_LOG_INFO, "HTTP hostname: %x", addr4.sin_addr.s_addr);
-//                }
-//            }
             if (cur->tcp.connect_sent == TCP_CONNECT_NOT_SENT) {
                 if (len > 0) {
                     char buffer[512];
@@ -753,20 +691,19 @@ jboolean handle_tcp(const struct arguments *args,
                     }
                 }
             }
+            if (cur->tcp.connect_sent != TCP_CONNECT_ESTABLISHED) {
+                char session[250];
+                sprintf(session,
+                        "%s %s loc %u rem %u acked %u",
+                        packet,
+                        strstate(cur->tcp.state),
+                        cur->tcp.local_seq - cur->tcp.local_start,
+                        cur->tcp.remote_seq - cur->tcp.remote_start,
+                        cur->tcp.acked - cur->tcp.local_start);
+                queue_tcp(args, tcphdr, session, &cur->tcp, data, datalen);
+                goto free;
+            }
         }
-        if (rport == 443 && cur->tcp.connect_sent != TCP_CONNECT_ESTABLISHED) {
-            char session[250];
-            sprintf(session,
-                    "%s %s loc %u rem %u acked %u",
-                    packet,
-                    strstate(cur->tcp.state),
-                    cur->tcp.local_seq - cur->tcp.local_start,
-                    cur->tcp.remote_seq - cur->tcp.remote_start,
-                    cur->tcp.acked - cur->tcp.local_start);
-            queue_tcp(args, tcphdr, session, &cur->tcp, data, datalen);
-            goto free;
-        }
-
 
         char session[250];
         sprintf(session,
@@ -818,7 +755,7 @@ jboolean handle_tcp(const struct arguments *args,
             } else {
                 if (!tcphdr->ack || ntohl(tcphdr->ack_seq) == cur->tcp.local_seq) {
                     if (tcphdr->syn) {
-                        log_android(ANDROID_LOG_WARN, "%s repeated SYN", session);
+                        log_android(ANDROID_LOG_DEBUG, "%s repeated SYN", session);
                         // The socket is probably not opened yet
 
                     } else if (tcphdr->fin /* +ACK */) {
@@ -839,7 +776,7 @@ jboolean handle_tcp(const struct arguments *args,
                             if (write_ack(args, &cur->tcp) >= 0)
                                 cur->tcp.state = TCP_CLOSE;
                         } else {
-                            log_android(ANDROID_LOG_WARN, "%s invalid FIN", session);
+                            log_android(ANDROID_LOG_DEBUG, "%s invalid FIN", session);
                             goto free;
                         }
 

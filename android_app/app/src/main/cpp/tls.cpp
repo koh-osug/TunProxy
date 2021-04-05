@@ -187,6 +187,8 @@ void parse_tls_header(const char *data, size_t data_len, char *hostname)
     return;
  error:
     if (data_len > 0) {
-        log_android_hex(ANDROID_LOG_WARN, "TLS Server Name Indication not found: ", (unsigned char *) data, data_len);
+        char *_hex = hex((const uint8_t *)data, data_len);
+        log_android(ANDROID_LOG_WARN, "TLS Server Name Indication not found: %s", hex);
+        free(_hex);
     }
 }

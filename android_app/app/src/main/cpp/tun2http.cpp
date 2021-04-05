@@ -196,22 +196,6 @@ int protect_socket(const struct arguments *args, int socket) {
 }
 
 
-jobject jniGlobalRef(JNIEnv *env, jobject cls) {
-    jobject gcls = env->NewGlobalRef(cls);
-    if (gcls == nullptr)
-        log_android(ANDROID_LOG_ERROR, "Global ref failed (out of memory?)");
-    return gcls;
-}
-
-jclass jniFindClass(JNIEnv *env, const char *name) {
-    jclass cls = env->FindClass(name);
-    if (cls == nullptr)
-        log_android(ANDROID_LOG_ERROR, "Class %s not found", name);
-    else
-        jniCheckException(env);
-    return cls;
-}
-
 jmethodID jniGetMethodID(JNIEnv *env, jclass cls, const char *name, const char *signature) {
     jmethodID method = env->GetMethodID(cls, name, signature);
     if (method == nullptr) {

@@ -39,47 +39,12 @@ int compare_u32(uint32_t s1, uint32_t s2) {
         return 1;
 }
 
-int sdk_int(JNIEnv *env) {
-    jclass clsVersion = jniFindClass(env, "android/os/Build$VERSION");
-    jfieldID fid = env->GetStaticFieldID(clsVersion, "SDK_INT", "I");
-    return env->GetStaticIntField(clsVersion, fid);
-}
-
 void log_android(int prio, const char *fmt, ...) {
     if (prio >= loglevel) {
         va_list args;
         va_start(args, fmt);
         __android_log_vprint(prio, "TunProxy", fmt, args);
         va_end(args);
-    }
-}
-
-void log_android_hex(int prio, const char *msg, unsigned char *buffer, int bufferLength) {
-    if (prio >= loglevel) {
-        char *bufferMsg;
-        int i;
-        // each hex string needs the double size + termination
-        bufferMsg = (char *) malloc(bufferLength * sizeof(char) * 2 + sizeof(char));
-        // allocation did not succeed
-        if (bufferMsg == nullptr) {
-            log_android(ANDROID_LOG_ERROR, "%sLOG ERROR: Could not allocate log buffer.", msg);
-            return;
-        }
-        for (i = 0; i < bufferLength; i++) {
-            snprintf(bufferMsg + (i * 2), (bufferLength - i) * sizeof(char) * 2 + sizeof(char),
-                     "%02X",
-                     (buffer[i] & 0x00FF));
-        }
-        bufferMsg[i] = '\0';
-        // print msg or not
-        if ((msg == nullptr) || (strlen(msg) == 0)) {
-            log_android(prio, "%s", bufferMsg);
-        } else {
-            log_android(prio, "%s%s", msg, bufferMsg);
-        }
-        if (bufferMsg) {
-            free(bufferMsg);
-        }
     }
 }
 
@@ -142,7 +107,7 @@ char *hex(const u_int8_t *data, const size_t len) {
     char hex_str[] = "0123456789ABCDEF";
 
     char *hexout;
-    hexout = (char *) malloc(len * 3 + 1); // TODO free
+    hexout = (char *) malloc(len * 3 + 1);
 
     for (size_t i = 0; i < len; i++) {
         hexout[i * 3 + 0] = hex_str[(data[i] >> 4) & 0x0F];

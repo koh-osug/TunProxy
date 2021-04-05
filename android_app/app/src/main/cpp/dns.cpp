@@ -164,9 +164,3 @@ int get_dns_query(const struct arguments *args, const struct udp_session *u,
 
     return -1;
 }
-
-int check_domain(const struct arguments *args, const struct udp_session *u,
-                 const uint8_t *data, const size_t datalen,
-                 uint16_t qclass, uint16_t qtype, const char *name) {
-    return 0;
-}

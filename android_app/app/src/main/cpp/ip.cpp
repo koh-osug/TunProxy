@@ -378,7 +378,7 @@ jint get_uid_sub(const int version, const int protocol,
     }
 
     if (fclose(fd))
-        log_android(ANDROID_LOG_ERROR, "fclose %s error %d: %s", fn, errno, strerror(errno));
+        log_android(ANDROID_LOG_WARN, "fclose %s error %d: %s", fn, errno, strerror(errno));
 
 #ifdef PROFILE_UID
     gettimeofday(&end, NULL);

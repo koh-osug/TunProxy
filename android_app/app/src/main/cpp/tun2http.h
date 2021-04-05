@@ -172,7 +172,7 @@ struct tcp_session {
     int connect_sent;
 };
 
-struct ng_session {
+typedef struct ng_session {
     uint8_t protocol;
     union {
         struct icmp_session icmp;
@@ -238,14 +238,6 @@ struct dns_header {
     uint16_t add_count; // number of resource entries
 } __packed;
 
-typedef struct dns_rr {
-    __be16 qname_ptr;
-    __be16 qtype;
-    __be16 qclass;
-    __be32 ttl;
-    __be16 rdlength;
-} __packed dns_rr;
-
 // DHCP
 
 #define DHCP_OPTION_MAGIC_NUMBER (0x63825363)
@@ -268,20 +260,9 @@ typedef struct dhcp_packet {
     uint32_t option_format;
 } __packed dhcp_packet;
 
-typedef struct dhcp_option {
-    uint8_t code;
-    uint8_t length;
-} __packed dhcp_option;
-
 // Prototypes
 
-void handle_signal(int sig, siginfo_t *info, void *context);
-
 void *handle_events(void *a);
-
-void report_exit(const struct arguments *args, const char *fmt, ...);
-
-void report_error(const struct arguments *args, jint error, const char *fmt, ...);
 
 void check_allowed(const struct arguments *args);
 
@@ -364,10 +345,6 @@ int get_dns_query(const struct arguments *args, const struct udp_session *u,
                   const uint8_t *data, const size_t datalen,
                   uint16_t *qtype, uint16_t *qclass, char *qname);
 
-int check_domain(const struct arguments *args, const struct udp_session *u,
-                 const uint8_t *data, const size_t datalen,
-                 uint16_t qclass, uint16_t qtype, const char *name);
-
 int check_dhcp(const struct arguments *args, const struct udp_session *u,
                const uint8_t *data, const size_t datalen);
 
@@ -405,8 +382,6 @@ int write_fin_ack(const struct arguments *args, struct tcp_session *cur);
 
 void write_rst(const struct arguments *args, struct tcp_session *cur);
 
-void write_rst_ack(const struct arguments *args, struct tcp_session *cur);
-
 ssize_t write_icmp(const struct arguments *args, const struct icmp_session *cur,
                    uint8_t *data, size_t datalen);
 
@@ -433,53 +408,13 @@ int protect_socket(const struct arguments *args, int socket);
 
 uint16_t calc_checksum(uint16_t start, const uint8_t *buffer, size_t length);
 
-jobject jniGlobalRef(JNIEnv *env, jobject cls);
-
-jclass jniFindClass(JNIEnv *env, const char *name);
-
 jmethodID jniGetMethodID(JNIEnv *env, jclass cls, const char *name, const char *signature);
-
-jfieldID jniGetFieldID(JNIEnv *env, jclass cls, const char *name, const char *type);
-
-jobject jniNewObject(JNIEnv *env, jclass cls, jmethodID constructor, const char *name);
 
 int jniCheckException(JNIEnv *env);
 
-int sdk_int(JNIEnv *env);
-
 void log_android(int prio, const char *fmt, ...);
 
-void log_android_hex(int prio, const char *msg, unsigned char *buffer, int bufferLength);
-
-void log_packet(const struct arguments *args, jobject jpacket);
-
-void dns_resolved(const struct arguments *args,
-                  const char *qname, const char *aname, const char *resource, int ttl);
-
-jboolean is_domain_blocked(const struct arguments *args, const char *name);
-
 struct allowed *is_address_allowed(const struct arguments *args, jobject objPacket);
-
-jobject create_packet(const struct arguments *args,
-                      jint version,
-                      jint protocol,
-                      const char *flags,
-                      const char *source,
-                      jint sport,
-                      const char *dest,
-                      jint dport,
-                      const char *data,
-                      jint uid,
-                      jboolean allowed);
-
-void account_usage(const struct arguments *args, jint version, jint protocol,
-                   const char *daddr, jint dport, jint uid, jlong sent, jlong received);
-
-void write_pcap_hdr();
-
-void write_pcap_rec(const uint8_t *buffer, size_t len);
-
-void write_pcap(const void *ptr, size_t len);
 
 int compare_u32(uint32_t seq1, uint32_t seq2);
 

@@ -10,12 +10,12 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
 
     log_android(ANDROID_LOG_DEBUG, "DHCP check");
 
-    if (datalen < sizeof(struct dhcp_packet)) {
+    if (datalen < sizeof(dhcp_packet)) {
         log_android(ANDROID_LOG_VERBOSE, "DHCP packet size %d", datalen);
         return -1;
     }
 
-    const struct dhcp_packet *request = (struct dhcp_packet *) data;
+    const dhcp_packet *request = (dhcp_packet *) data;
 
     if (ntohl(request->option_format) != DHCP_OPTION_MAGIC_NUMBER) {
         log_android(ANDROID_LOG_ERROR, "DHCP invalid magic %x", request->option_format);
@@ -36,7 +36,7 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
     // Ack: source: 10.1.10.1 destination: 255.255.255.255
 
     if (request->opcode == 1) { // Discover/request
-        struct dhcp_packet *response = static_cast<dhcp_packet *>(calloc(500, 1));
+        dhcp_packet *response = static_cast<dhcp_packet *>(calloc(500, 1));
 
         // Hack
         inet_pton(AF_INET, "10.1.10.1", (void *) &u->saddr);
@@ -54,7 +54,7 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
             DHCP option 54: 192.168.1.1 DHCP server.
         */
 
-        memcpy(response, request, sizeof(struct dhcp_packet));
+        memcpy(response, request, sizeof(dhcp_packet));
         response->opcode = (uint8_t) (request->siaddr == 0 ? 2 /* Offer */ : /* Ack */ 4);
         response->secs = 0;
         response->flags = 0;
@@ -64,7 +64,7 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
         memset(&response->giaddr, 0, sizeof(response->giaddr));
 
         // https://tools.ietf.org/html/rfc2132
-        uint8_t *options = (uint8_t *) (response + sizeof(struct dhcp_packet));
+        uint8_t *options = (uint8_t *) (response + sizeof(dhcp_packet));
 
         int idx = 0;
         *(options + idx++) = 53; // Message type
