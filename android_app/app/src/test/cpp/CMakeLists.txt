@@ -11,9 +11,9 @@ if (${ENABLE_CPP_TESTS} MATCHES "true")
     target_include_directories(gtest PUBLIC ${GTEST_DIR}/include)
 
     add_executable(test-tcp ${TEST_SRC_DIR}/test-tcp.cpp
-            ${PROJECT_SOURCE_DIR}/src/main/cpp/tls.cpp
-            ${PROJECT_SOURCE_DIR}/src/main/cpp/util.cpp
-            ${PROJECT_SOURCE_DIR}/src/main/cpp/tun2http.cpp)
+            ${PROJECT_SOURCE_DIR}/src/main/cpp/tls.c
+            ${PROJECT_SOURCE_DIR}/src/main/cpp/util.c
+            ${PROJECT_SOURCE_DIR}/src/main/cpp/netguard.c)
 
     find_library(log-lib log)
 

@@ -1,3 +1,6 @@
+#ifndef TUN2HTTP_NETGUARD_H
+#define TUN2HTTP_NETGUARD_H
+
 #include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,6 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <setjmp.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <dirent.h>
@@ -20,6 +24,8 @@
 
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/in6.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <netinet/udp.h>
@@ -30,34 +36,59 @@
 #include <android/log.h>
 #include <sys/system_properties.h>
 
+#define TAG "TunProxy.JNI"
+
+// #define PROFILE_JNI 5
+// #define PROFILE_MEMORY
+
 #define EPOLL_TIMEOUT 3600 // seconds
 #define EPOLL_EVENTS 20
 #define EPOLL_MIN_CHECK 100 // milliseconds
+
+#define TUN_YIELD 10 // packets
 
 #define ICMP4_MAXMSG (IP_MAXPACKET - 20 - 8) // bytes (socket)
 #define ICMP6_MAXMSG (IPV6_MAXPACKET - 40 - 8) // bytes (socket)
 #define UDP4_MAXMSG (IP_MAXPACKET - 20 - 8) // bytes (socket)
 #define UDP6_MAXMSG (IPV6_MAXPACKET - 40 - 8) // bytes (socket)
 
-#define ICMP_TIMEOUT 15 // seconds
+#define ICMP_TIMEOUT 5 // seconds
 
 #define UDP_TIMEOUT_53 15 // seconds
 #define UDP_TIMEOUT_ANY 300 // seconds
 #define UDP_KEEP_TIMEOUT 60 // seconds
+#define UDP_YIELD 10 // packets
 
-#define TCP_INIT_TIMEOUT 30 // seconds ~net.inet.tcp.keepinit
+#define TCP_INIT_TIMEOUT 20 // seconds ~net.inet.tcp.keepinit
 #define TCP_IDLE_TIMEOUT 3600 // seconds ~net.inet.tcp.keepidle
-#define TCP_CLOSE_TIMEOUT 30 // seconds
+#define TCP_CLOSE_TIMEOUT 20 // seconds
 #define TCP_KEEP_TIMEOUT 300 // seconds
 // https://en.wikipedia.org/wiki/Maximum_segment_lifetime
 
 #define SESSION_LIMIT 40 // percent
+#define SESSION_MAX (1024 * SESSION_LIMIT / 100) // number
 
 #define TCP_CONNECT_NOT_SENT -1
 #define TCP_CONNECT_SENT 0
 #define TCP_CONNECT_ESTABLISHED 1
 
-#define MTU 10000
+#define SEND_BUF_DEFAULT 163840 // bytes
+
+#define UID_MAX_AGE 30000 // milliseconds
+
+#define SOCKS5_NONE 1
+#define SOCKS5_HELLO 2
+#define SOCKS5_AUTH 3
+#define SOCKS5_CONNECT 4
+#define SOCKS5_CONNECTED 5
+
+struct context {
+    pthread_mutex_t lock;
+    int pipefds[2];
+    int stopping;
+    int sdk;
+    struct ng_session *ng_session;
+};
 
 struct arguments {
     JNIEnv *env;
@@ -65,13 +96,7 @@ struct arguments {
     int tun;
     jboolean fwd53;
     jint rcode;
-    char proxyIp[128];
-    int proxyPort;
-};
-
-struct allowed {
-    char raddr[INET6_ADDRSTRLEN + 1];
-    uint16_t rport; // host notation
+    struct context *ctx;
 };
 
 struct segment {
@@ -141,6 +166,7 @@ struct tcp_session {
     uint8_t send_scale;
     uint32_t recv_window; // host notation, scaled
     uint32_t send_window; // host notation, scaled
+    uint16_t unconfirmed; // packets
 
     uint32_t remote_seq; // confirmed bytes received, host notation
     uint32_t local_seq; // confirmed bytes sent, host notation
@@ -166,13 +192,14 @@ struct tcp_session {
     __be16 dest; // network notation
 
     uint8_t state;
+    uint8_t socks5;
     struct segment *forward;
 
     char hostname[512];
     int connect_sent;
 };
 
-typedef struct ng_session {
+struct ng_session {
     uint8_t protocol;
     union {
         struct icmp_session icmp;
@@ -184,6 +211,17 @@ typedef struct ng_session {
     struct ng_session *next;
 };
 
+struct uid_cache_entry {
+    uint8_t version;
+    uint8_t protocol;
+    uint8_t saddr[16];
+    uint16_t sport;
+    uint8_t daddr[16];
+    uint16_t dport;
+    jint uid;
+    long time;
+};
+
 // IPv6
 
 struct ip6_hdr_pseudo {
@@ -193,6 +231,30 @@ struct ip6_hdr_pseudo {
     u_int8_t ip6ph_zero[3];
     u_int8_t ip6ph_nxt;
 } __packed;
+
+// PCAP
+// https://wiki.wireshark.org/Development/LibpcapFileFormat
+
+typedef uint16_t guint16_t;
+typedef uint32_t guint32_t;
+typedef int32_t gint32_t;
+
+typedef struct pcap_hdr_s {
+    guint32_t magic_number;
+    guint16_t version_major;
+    guint16_t version_minor;
+    gint32_t thiszone;
+    guint32_t sigfigs;
+    guint32_t snaplen;
+    guint32_t network;
+} __packed pcap_hdr_s;
+
+typedef struct pcaprec_hdr_s {
+    guint32_t ts_sec;
+    guint32_t ts_usec;
+    guint32_t incl_len;
+    guint32_t orig_len;
+} __packed pcaprec_hdr_s;
 
 #define LINKTYPE_RAW 101
 
@@ -238,6 +300,14 @@ struct dns_header {
     uint16_t add_count; // number of resource entries
 } __packed;
 
+typedef struct dns_rr {
+    __be16 qname_ptr;
+    __be16 qtype;
+    __be16 qclass;
+    __be32 ttl;
+    __be16 rdlength;
+} __packed dns_rr;
+
 // DHCP
 
 #define DHCP_OPTION_MAGIC_NUMBER (0x63825363)
@@ -260,15 +330,26 @@ typedef struct dhcp_packet {
     uint32_t option_format;
 } __packed dhcp_packet;
 
+typedef struct dhcp_option {
+    uint8_t code;
+    uint8_t length;
+} __packed dhcp_option;
+
 // Prototypes
 
+void handle_signal(int sig, siginfo_t *info, void *context);
+
 void *handle_events(void *a);
+
+void report_exit(const struct arguments *args, const char *fmt, ...);
+
+void report_error(const struct arguments *args, jint error, const char *fmt, ...);
 
 void check_allowed(const struct arguments *args);
 
 void init(const struct arguments *args);
 
-void clear();
+void clear(struct context *ctx);
 
 int check_icmp_session(const struct arguments *args,
                        struct ng_session *s,
@@ -305,12 +386,12 @@ void check_udp_socket(const struct arguments *args, const struct epoll_event *ev
 
 int32_t get_qname(const uint8_t *data, const size_t datalen, uint16_t off, char *qname);
 
-void parse_dns_response(const struct arguments *args, const struct udp_session *u,
+void parse_dns_response(const struct arguments *args, const struct ng_session *session,
                         const uint8_t *data, size_t *datalen);
 
 uint32_t get_send_window(const struct tcp_session *cur);
 
-int get_receive_buffer(const struct ng_session *cur);
+uint32_t get_receive_buffer(const struct ng_session *cur);
 
 uint32_t get_receive_window(const struct ng_session *cur);
 
@@ -335,15 +416,16 @@ jboolean handle_icmp(const struct arguments *args,
 
 int has_udp_session(const struct arguments *args, const uint8_t *pkt, const uint8_t *payload);
 
+void block_udp(const struct arguments *args,
+               const uint8_t *pkt, size_t length,
+               const uint8_t *payload,
+               int uid);
+
 jboolean handle_udp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
                     const uint8_t *payload,
-                    int uid,
+                    int uid, struct allowed *redirect,
                     const int epoll_fd);
-
-int get_dns_query(const struct arguments *args, const struct udp_session *u,
-                  const uint8_t *data, const size_t datalen,
-                  uint16_t *qtype, uint16_t *qclass, char *qname);
 
 int check_dhcp(const struct arguments *args, const struct udp_session *u,
                const uint8_t *data, const size_t datalen);
@@ -353,7 +435,7 @@ void clear_tcp_data(struct tcp_session *cur);
 jboolean handle_tcp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
                     const uint8_t *payload,
-                    int uid,
+                    int uid, int allowed, struct allowed *redirect,
                     const int epoll_fd);
 
 void queue_tcp(const struct arguments *args,
@@ -382,6 +464,8 @@ int write_fin_ack(const struct arguments *args, struct tcp_session *cur);
 
 void write_rst(const struct arguments *args, struct tcp_session *cur);
 
+void write_rst_ack(const struct arguments *args, struct tcp_session *cur);
+
 ssize_t write_icmp(const struct arguments *args, const struct icmp_session *cur,
                    uint8_t *data, size_t datalen);
 
@@ -402,19 +486,52 @@ jint get_uid(const int version, const int protocol,
 
 jint get_uid_sub(const int version, const int protocol,
                  const void *saddr, const uint16_t sport,
-                 const void *daddr, const uint16_t dport);
+                 const void *daddr, const uint16_t dport,
+                 const char *source, const char *dest,
+                 long now);
 
 int protect_socket(const struct arguments *args, int socket);
 
 uint16_t calc_checksum(uint16_t start, const uint8_t *buffer, size_t length);
 
+jobject jniGlobalRef(JNIEnv *env, jobject cls);
+
+jclass jniFindClass(JNIEnv *env, const char *name);
+
 jmethodID jniGetMethodID(JNIEnv *env, jclass cls, const char *name, const char *signature);
+
+jfieldID jniGetFieldID(JNIEnv *env, jclass cls, const char *name, const char *type);
+
+jobject jniNewObject(JNIEnv *env, jclass cls, jmethodID constructor, const char *name);
 
 int jniCheckException(JNIEnv *env);
 
+int sdk_int(JNIEnv *env);
+
 void log_android(int prio, const char *fmt, ...);
 
+void log_packet(const struct arguments *args, jobject jpacket);
+
+void dns_resolved(const struct arguments *args,
+                  const char *qname, const char *aname, const char *resource, int ttl);
+
+jboolean is_domain_blocked(const struct arguments *args, const char *name);
+
+jint get_uid_q(const struct arguments *args,
+               jint version,
+               jint protocol,
+               const char *source,
+               jint sport,
+               const char *dest,
+               jint dport);
+
 struct allowed *is_address_allowed(const struct arguments *args, jobject objPacket);
+
+void write_pcap_hdr();
+
+void write_pcap_rec(const uint8_t *buffer, size_t len);
+
+void write_pcap(const void *ptr, size_t len);
 
 int compare_u32(uint32_t seq1, uint32_t seq2);
 
@@ -427,3 +544,19 @@ int is_readable(int fd);
 int is_writable(int fd);
 
 long long get_ms();
+
+void ng_add_alloc(void *ptr, const char *tag);
+
+void ng_delete_alloc(void *ptr, const char *file, int line);
+
+void *ng_malloc(size_t __byte_count, const char *tag);
+
+void *ng_calloc(size_t __item_count, size_t __item_size, const char *tag);
+
+void *ng_realloc(void *__ptr, size_t __byte_count, const char *tag);
+
+void ng_free(void *__ptr, const char *file, int line);
+
+void ng_dump();
+
+#endif

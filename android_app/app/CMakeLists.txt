@@ -1,4 +1,4 @@
-project(TunProxy CXX)
+project(TunProxy)
 cmake_minimum_required(VERSION 3.10.2)
 
 include_directories(.)
@@ -11,17 +11,18 @@ add_library( # Sets the name of the library.
         # Sets the library as a shared library.
         SHARED
 
-        src/main/cpp/dhcp.cpp
-        src/main/cpp/dns.cpp
-        src/main/cpp/icmp.cpp
-        src/main/cpp/ip.cpp
-        src/main/cpp/http.cpp
-        src/main/cpp/tun2http.cpp
-        src/main/cpp/session.cpp
-        src/main/cpp/tcp.cpp
-        src/main/cpp/tls.cpp
-        src/main/cpp/udp.cpp
-        src/main/cpp/util.cpp
+        src/main/cpp/dhcp.c
+        src/main/cpp/dns.c
+        src/main/cpp/icmp.c
+        src/main/cpp/ip.c
+        src/main/cpp/http.c
+        src/main/cpp/netguard.c
+        src/main/cpp/session.c
+        src/main/cpp/pcap.c
+        src/main/cpp/tcp.c
+        src/main/cpp/tls.c
+        src/main/cpp/udp.c
+        src/main/cpp/util.c
         )
 
 find_library( # Sets the name of the path variable.

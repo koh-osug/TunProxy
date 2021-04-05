@@ -1,15 +1,30 @@
+/*
+    This file is part of NetGuard.
 
+    NetGuard is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-#include "tun2http.h"
-#include <android/log.h>
-#include <cstdarg>
+    NetGuard is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
+
+    Copyright 2015-2019 by Marcel Bokhorst (M66B)
+*/
+
+#include "netguard.h"
 
 extern int loglevel;
 
 uint16_t calc_checksum(uint16_t start, const uint8_t *buffer, size_t length) {
-    uint32_t sum = start;
-    uint16_t *buf = (uint16_t *) buffer;
-    size_t len = length;
+    register uint32_t sum = start;
+    register uint16_t *buf = (uint16_t *) buffer;
+    register size_t len = length;
 
     while (len > 1) {
         sum += *buf++;
@@ -30,8 +45,8 @@ int compare_u32(uint32_t s1, uint32_t s2) {
     if (s1 == s2)
         return 0;
 
-    int i1 = s1;
-    int i2 = s2;
+    uint32_t i1 = s1;
+    uint32_t i2 = s2;
     if ((i1 < i2 && i2 - i1 < 0x7FFFFFFF) ||
         (i1 > i2 && i1 - i2 > 0x7FFFFFFF))
         return -1;
@@ -39,11 +54,17 @@ int compare_u32(uint32_t s1, uint32_t s2) {
         return 1;
 }
 
+int sdk_int(JNIEnv *env) {
+    jclass clsVersion = jniFindClass(env, "android/os/Build$VERSION");
+    jfieldID fid = (*env)->GetStaticFieldID(env, clsVersion, "SDK_INT", "I");
+    return (*env)->GetStaticIntField(env, clsVersion, fid);
+}
+
 void log_android(int prio, const char *fmt, ...) {
     if (prio >= loglevel) {
         va_list args;
         va_start(args, fmt);
-        __android_log_vprint(prio, "TunProxy", fmt, args);
+        __android_log_vprint(prio, TAG, fmt, args);
         va_end(args);
     }
 }
@@ -107,7 +128,7 @@ char *hex(const u_int8_t *data, const size_t len) {
     char hex_str[] = "0123456789ABCDEF";
 
     char *hexout;
-    hexout = (char *) malloc(len * 3 + 1);
+    hexout = (char *) ng_malloc(len * 3 + 1, "hex"); // TODO free
 
     for (size_t i = 0; i < len; i++) {
         hexout[i * 3 + 0] = hex_str[(data[i] >> 4) & 0x0F];
@@ -125,8 +146,7 @@ int32_t get_local_port(const int sock) {
     if (getsockname(sock, (struct sockaddr *) &sin, &len) < 0) {
         log_android(ANDROID_LOG_ERROR, "getsockname error %d: %s", errno, strerror(errno));
         return -1;
-    }
-    else
+    } else
         return ntohs(sin.sin_port);
 }
 
@@ -139,8 +159,7 @@ int is_event(int fd, short event) {
     if (r < 0) {
         log_android(ANDROID_LOG_ERROR, "poll readable error %d: %s", errno, strerror(errno));
         return 0;
-    }
-    else if (r == 0)
+    } else if (r == 0)
         return 0;
     else
         return (p.revents & event);

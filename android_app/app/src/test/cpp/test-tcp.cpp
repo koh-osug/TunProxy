@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
-#include "tls.h"
+extern "C" {
+    #include "tls.h"
+}
 
 static size_t from_hex(const char *hex, char *data) {
     char *pos = (char *)hex;

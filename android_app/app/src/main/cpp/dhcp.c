@@ -1,6 +1,23 @@
+/*
+    This file is part of NetGuard.
 
+    NetGuard is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-#include "tun2http.h"
+    NetGuard is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
+
+    Copyright 2015-2019 by Marcel Bokhorst (M66B)
+*/
+
+#include "netguard.h"
 
 int check_dhcp(const struct arguments *args, const struct udp_session *u,
                const uint8_t *data, const size_t datalen) {
@@ -10,12 +27,12 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
 
     log_android(ANDROID_LOG_DEBUG, "DHCP check");
 
-    if (datalen < sizeof(dhcp_packet)) {
+    if (datalen < sizeof(struct dhcp_packet)) {
         log_android(ANDROID_LOG_VERBOSE, "DHCP packet size %d", datalen);
         return -1;
     }
 
-    const dhcp_packet *request = (dhcp_packet *) data;
+    const struct dhcp_packet *request = (struct dhcp_packet *) data;
 
     if (ntohl(request->option_format) != DHCP_OPTION_MAGIC_NUMBER) {
         log_android(ANDROID_LOG_ERROR, "DHCP invalid magic %x", request->option_format);
@@ -36,7 +53,7 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
     // Ack: source: 10.1.10.1 destination: 255.255.255.255
 
     if (request->opcode == 1) { // Discover/request
-        dhcp_packet *response = static_cast<dhcp_packet *>(calloc(500, 1));
+        struct dhcp_packet *response = ng_calloc(500, 1, "dhcp");
 
         // Hack
         inet_pton(AF_INET, "10.1.10.1", (void *) &u->saddr);
@@ -54,7 +71,7 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
             DHCP option 54: 192.168.1.1 DHCP server.
         */
 
-        memcpy(response, request, sizeof(dhcp_packet));
+        memcpy(response, request, sizeof(struct dhcp_packet));
         response->opcode = (uint8_t) (request->siaddr == 0 ? 2 /* Offer */ : /* Ack */ 4);
         response->secs = 0;
         response->flags = 0;
@@ -64,7 +81,7 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
         memset(&response->giaddr, 0, sizeof(response->giaddr));
 
         // https://tools.ietf.org/html/rfc2132
-        uint8_t *options = (uint8_t *) (response + sizeof(dhcp_packet));
+        uint8_t *options = (uint8_t *) (response + sizeof(struct dhcp_packet));
 
         int idx = 0;
         *(options + idx++) = 53; // Message type
@@ -119,7 +136,7 @@ int check_dhcp(const struct arguments *args, const struct udp_session *u,
 
         write_udp(args, u, (uint8_t *) response, 500);
 
-        free(response);
+        ng_free(response, __FILE__, __LINE__);
     }
 
     return 0;

@@ -1,11 +1,11 @@
 
 
-#include <cstdio>
-#include <cstdlib> /* malloc() */
-#include <cstring> /* strncpy() */
+#include <stdio.h>
+#include <stdlib.h> /* malloc() */
+#include <string.h> /* strncpy() */
 #include <sys/socket.h>
 #include <android/log.h>
-#include <tun2http.h>
+#include <netguard.h>
 
 #define TLS_HEADER_LEN 5
 #define TLS_HANDSHAKE_CONTENT_TYPE 0x16

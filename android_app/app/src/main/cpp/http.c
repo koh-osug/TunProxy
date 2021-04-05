@@ -1,12 +1,11 @@
 
-#include <cstdio>
-#include <cstdlib> /* malloc() */
-#include <cstring> /* strncpy() */
+#include <stdio.h>
+#include <stdlib.h> /* malloc() */
+#include <string.h> /* strncpy() */
 #include <strings.h> /* strncasecmp() */
-#include <cctype> /* isblank() */
+#include <ctype.h> /* isblank() */
 
 #include <android/log.h>
-
 
 static const char http_503[] =
         "HTTP/1.1 503 Service Temporarily Unavailable\r\n"
@@ -29,9 +28,9 @@ static const char http_503[] =
  *
  */
 
-#include "tun2http.h"
+#include "netguard.h"
 
-int next_header(const char **data, size_t *len) {
+static int next_header(const char **data, size_t *len) {
     int header_len;
 
     /* perhaps we can optimize this to reuse the value of header_len, rather
@@ -56,7 +55,7 @@ int next_header(const char **data, size_t *len) {
     return header_len;
 }
 
-int get_header(const char *header, const char *data, size_t data_len, char *value) {
+static int get_header(const char *header, const char *data, size_t data_len, char *value) {
     int len, header_len;
 
     header_len = strlen(header);
@@ -68,7 +67,7 @@ int get_header(const char *header, const char *data, size_t data_len, char *valu
             while (header_len < len && isblank(data[header_len]))
                 header_len++;
 
-            if (value == nullptr)
+            if (value == NULL)
                 return -4;
 
             strncpy(value, data + header_len, len - header_len);
@@ -85,7 +84,7 @@ int get_header(const char *header, const char *data, size_t data_len, char *valu
     return -2;
 }
 
-uint8_t *find_data(uint8_t *data, size_t data_len, const char *value) {
+static uint8_t *find_data(uint8_t *data, size_t data_len, char *value) {
 
     int found = 0;
     int value_length = strlen(value);
@@ -95,7 +94,7 @@ uint8_t *find_data(uint8_t *data, size_t data_len, const char *value) {
             data++;
             data_len--;
         }
-        if (strncasecmp(value, reinterpret_cast<const char *>(data), value_length) == 0) {
+        if (strncasecmp(value, data, value_length) == 0) {
             found = 1;
         } else {
             data++;
@@ -106,13 +105,13 @@ uint8_t *find_data(uint8_t *data, size_t data_len, const char *value) {
         return data;
     }
 
-    return nullptr;
+    return 0;
 }
 
-uint_t patch_buffer[2*MTU];
+static uint_t patch_buffer[2048];
 
 uint8_t *patch_http_url(uint8_t *data, size_t *data_len) {
-    log_android(ANDROID_LOG_VERBOSE, "patch_http_url start");
+    log_android(ANDROID_LOG_DEBUG, "patch_http_url start");
 
     char hostname[1024];
     uint8_t *host = find_data(data, *data_len, "Host: ");
@@ -126,53 +125,55 @@ uint8_t *patch_http_url(uint8_t *data, size_t *data_len) {
         }
     } else {
         log_android(ANDROID_LOG_VERBOSE, "patch_http_url no host");
-        return nullptr;
+        return 0;
     }
 
     log_android(ANDROID_LOG_VERBOSE, "patch_http_url find word");
 
     //GET POST PUT DELETE HEAD OPTIONS PATCH
-    const char *word;
-    uint8_t *pos = nullptr;
-    if ((pos = find_data(data, *data_len, "GET "))) {
+    char *word;
+    uint8_t *pos = 0;
+    if ((pos = find_data(data, *data_len, "GET ")) > 0) {
         word = "GET ";
-    } else if ((pos = find_data(data, *data_len, "POST "))) {
+    } else if ((pos = find_data(data, *data_len, "POST ")) > 0) {
         word = "POST ";
-    } else if ((pos = find_data(data, *data_len, "PUT "))) {
+    } else if ((pos = find_data(data, *data_len, "PUT ")) > 0) {
         word = "PUT ";
-    } else if ((pos = find_data(data, *data_len, "DELETE "))) {
+    } else if ((pos = find_data(data, *data_len, "DELETE ")) > 0) {
         word = "DELETE ";
-    } else if ((pos = find_data(data, *data_len, "OPTIONS "))) {
-        word = "OPTIONS ";
-    } else if ((pos = find_data(data, *data_len, "PATCH "))) {
-        word = "PATCH ";
-    } else if ((pos = find_data(data, *data_len, "HEAD "))) {
+    } else if ((pos = find_data(data, *data_len, "HEAD ")) > 0) {
         word = "HEAD ";
-    } else if ((pos = find_data(data, *data_len, "TRACE "))) {
+    } else if ((pos = find_data(data, *data_len, "OPTIONS ")) > 0) {
+        word = "OPTIONS ";
+    } else if ((pos = find_data(data, *data_len, "PATCH ")) > 0) {
+        word = "PATCH ";
+    } else if ((pos = find_data(data, *data_len, "HEAD ")) > 0) {
+        word = "HEAD ";
+    } else if ((pos = find_data(data, *data_len, "TRACE ")) > 0) {
         word = "TRACE ";
-    } else if ((pos = find_data(data, *data_len, "PROPFIND "))) {
+    } else if ((pos = find_data(data, *data_len, "PROPFIND ")) > 0) {
         word = "PROPFIND ";
-    } else if ((pos = find_data(data, *data_len, "PROPPATCH "))) {
+    } else if ((pos = find_data(data, *data_len, "PROPPATCH ")) > 0) {
         word = "PROPPATCH ";
-    } else if ((pos = find_data(data, *data_len, "MKCOL "))) {
+    } else if ((pos = find_data(data, *data_len, "MKCOL ")) > 0) {
         word = "MKCOL ";
-    } else if ((pos = find_data(data, *data_len, "COPY "))) {
+    } else if ((pos = find_data(data, *data_len, "COPY ")) > 0) {
         word = "COPY ";
-    } else if ((pos = find_data(data, *data_len, "MOVE "))) {
+    } else if ((pos = find_data(data, *data_len, "MOVE ")) > 0) {
         word = "MOVE ";
-    } else if ((pos = find_data(data, *data_len, "LOCK "))) {
+    } else if ((pos = find_data(data, *data_len, "LOCK ")) > 0) {
         word = "LOCK ";
-    } else if ((pos = find_data(data, *data_len, "UNLOCK "))) {
+    } else if ((pos = find_data(data, *data_len, "UNLOCK ")) > 0) {
         word = "UNLOCK ";
-    } else if ((pos = find_data(data, *data_len, "LINK "))) {
+    } else if ((pos = find_data(data, *data_len, "LINK ")) > 0) {
         word = "LINK ";
-    } else if ((pos = find_data(data, *data_len, "UNLINK "))) {
+    } else if ((pos = find_data(data, *data_len, "UNLINK "))> 0) {
         word = "UNLINK ";
     }
 
     if (!pos) {
         log_android(ANDROID_LOG_VERBOSE, "patch_http_url no word");
-        return nullptr;
+        return 0;
     }
 
 
@@ -189,10 +190,10 @@ uint8_t *patch_http_url(uint8_t *data, size_t *data_len) {
         data[pos1 + 4] == ':') {
 
         log_android(ANDROID_LOG_VERBOSE, "patch_http_url already patched");
-        return nullptr;
+        return 0;
     }
 
-    uint8_t *new_data = reinterpret_cast<uint8_t *>(&patch_buffer[0]);
+    uint8_t *new_data = &patch_buffer[0];
     log_android(ANDROID_LOG_VERBOSE, "patch_http_url start patch");
     memcpy(new_data, data, pos1);
 

@@ -1,7 +1,24 @@
+/*
+    This file is part of NetGuard.
 
-#include "tun2http.h"
+    NetGuard is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-extern struct ng_session *ng_session;
+    NetGuard is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with NetGuard.  If not, see <http://www.gnu.org/licenses/>.
+
+    Copyright 2015-2019 by Marcel Bokhorst (M66B)
+*/
+
+#include "netguard.h"
+
 extern FILE *pcap_file;
 
 int get_udp_timeout(const struct udp_session *u, int sessions, int maxsessions) {
@@ -15,7 +32,7 @@ int get_udp_timeout(const struct udp_session *u, int sessions, int maxsessions) 
 
 int check_udp_session(const struct arguments *args, struct ng_session *s,
                       int sessions, int maxsessions) {
-    time_t now = time(nullptr);
+    time_t now = time(NULL);
 
     char source[INET6_ADDRSTRLEN + 1];
     char dest[INET6_ADDRSTRLEN + 1];
@@ -46,7 +63,7 @@ int check_udp_session(const struct arguments *args, struct ng_session *s,
                         s->socket, errno, strerror(errno));
         s->socket = -1;
 
-        s->udp.time = time(nullptr);
+        s->udp.time = time(NULL);
         s->udp.state = UDP_CLOSED;
     }
 
@@ -68,7 +85,7 @@ void check_udp_socket(const struct arguments *args, const struct epoll_event *ev
 
     // Check socket error
     if (ev->events & EPOLLERR) {
-        s->udp.time = time(nullptr);
+        s->udp.time = time(NULL);
 
         int serr = 0;
         socklen_t optlen = sizeof(int);
@@ -83,9 +100,9 @@ void check_udp_socket(const struct arguments *args, const struct epoll_event *ev
     } else {
         // Check socket read
         if (ev->events & EPOLLIN) {
-            s->udp.time = time(nullptr);
+            s->udp.time = time(NULL);
 
-            uint8_t *buffer = static_cast<uint8_t *>(malloc(s->udp.mss));
+            uint8_t *buffer = ng_malloc(s->udp.mss, "udp recv");
             ssize_t bytes = recv(s->socket, buffer, s->udp.mss, 0);
             if (bytes < 0) {
                 // Socket error
@@ -112,7 +129,7 @@ void check_udp_socket(const struct arguments *args, const struct epoll_event *ev
 
                 // Process DNS response
                 if (ntohs(s->udp.dest) == 53)
-                    parse_dns_response(args, &s->udp, buffer, (size_t *) &bytes);
+                    parse_dns_response(args, s, buffer, (size_t *) &bytes);
 
                 // Forward to tun
                 if (write_udp(args, &s->udp, buffer, (size_t) bytes) < 0)
@@ -123,7 +140,7 @@ void check_udp_socket(const struct arguments *args, const struct epoll_event *ev
                         s->udp.state = UDP_FINISHING;
                 }
             }
-            free(buffer);
+            ng_free(buffer, __FILE__, __LINE__);
         }
     }
 }
@@ -139,8 +156,8 @@ int has_udp_session(const struct arguments *args, const uint8_t *pkt, const uint
         return 1;
 
     // Search session
-    struct ng_session *cur = ng_session;
-    while (cur != nullptr &&
+    struct ng_session *cur = args->ctx->ng_session;
+    while (cur != NULL &&
            !(cur->protocol == IPPROTO_UDP &&
              cur->udp.version == version &&
              cur->udp.source == udphdr->source && cur->udp.dest == udphdr->dest &&
@@ -150,7 +167,7 @@ int has_udp_session(const struct arguments *args, const uint8_t *pkt, const uint
                              memcmp(&cur->udp.daddr.ip6, &ip6->ip6_dst, 16) == 0)))
         cur = cur->next;
 
-    return (cur != nullptr);
+    return (cur != NULL);
 }
 
 void block_udp(const struct arguments *args,
@@ -177,10 +194,10 @@ void block_udp(const struct arguments *args,
                 source, ntohs(udphdr->source), dest, ntohs(udphdr->dest));
 
     // Register session
-    struct ng_session *s = (struct ng_session *)(malloc(sizeof(struct ng_session)));
+    struct ng_session *s = ng_malloc(sizeof(struct ng_session), "udp session block");
     s->protocol = IPPROTO_UDP;
 
-    s->udp.time = time(nullptr);
+    s->udp.time = time(NULL);
     s->udp.uid = uid;
     s->udp.version = version;
 
@@ -197,14 +214,14 @@ void block_udp(const struct arguments *args,
     s->udp.state = UDP_BLOCKED;
     s->socket = -1;
 
-    s->next = ng_session;
-    ng_session = s;
+    s->next = args->ctx->ng_session;
+    args->ctx->ng_session = s;
 }
 
 jboolean handle_udp(const struct arguments *args,
                     const uint8_t *pkt, size_t length,
                     const uint8_t *payload,
-                    int uid,
+                    int uid, struct allowed *redirect,
                     const int epoll_fd) {
     // Get headers
     const uint8_t version = (*pkt) >> 4;
@@ -215,8 +232,8 @@ jboolean handle_udp(const struct arguments *args,
     const size_t datalen = length - (data - pkt);
 
     // Search session
-    struct ng_session *cur = ng_session;
-    while (cur != nullptr &&
+    struct ng_session *cur = args->ctx->ng_session;
+    while (cur != NULL &&
            !(cur->protocol == IPPROTO_UDP &&
              cur->udp.version == version &&
              cur->udp.source == udphdr->source && cur->udp.dest == udphdr->dest &&
@@ -236,27 +253,30 @@ jboolean handle_udp(const struct arguments *args,
         inet_ntop(AF_INET6, &ip6->ip6_dst, dest, sizeof(dest));
     }
 
-    if (cur != nullptr && cur->udp.state != UDP_ACTIVE) {
-        log_android(ANDROID_LOG_DEBUG, "UDP ignore session from %s/%u to %s/%u state %d",
+    if (cur != NULL && cur->udp.state != UDP_ACTIVE) {
+        log_android(ANDROID_LOG_INFO, "UDP ignore session from %s/%u to %s/%u state %d",
                     source, ntohs(udphdr->source), dest, ntohs(udphdr->dest), cur->udp.state);
         return 0;
     }
 
     // Create new session if needed
-    if (cur == nullptr) {
+    if (cur == NULL) {
         log_android(ANDROID_LOG_INFO, "UDP new session from %s/%u to %s/%u",
                     source, ntohs(udphdr->source), dest, ntohs(udphdr->dest));
 
         // Register session
-        struct ng_session *s = (struct ng_session *)malloc(sizeof(struct ng_session));
+        struct ng_session *s = ng_malloc(sizeof(struct ng_session), "udp session");
         s->protocol = IPPROTO_UDP;
 
-        s->udp.time = time(nullptr);
+        s->udp.time = time(NULL);
         s->udp.uid = uid;
         s->udp.version = version;
 
         int rversion;
-        rversion = s->udp.version;
+        if (redirect == NULL)
+            rversion = s->udp.version;
+        else
+            rversion = (strstr(redirect->raddr, ":") == NULL ? 4 : 6);
         s->udp.mss = (uint16_t) (rversion == 4 ? UDP4_MAXMSG : UDP6_MAXMSG);
 
         s->udp.sent = 0;
@@ -273,12 +293,12 @@ jboolean handle_udp(const struct arguments *args,
         s->udp.source = udphdr->source;
         s->udp.dest = udphdr->dest;
         s->udp.state = UDP_ACTIVE;
-        s->next = nullptr;
+        s->next = NULL;
 
         // Open UDP socket
-        s->socket = open_udp_socket(args, &s->udp, 0);
+        s->socket = open_udp_socket(args, &s->udp, redirect);
         if (s->socket < 0) {
-            free(s);
+            ng_free(s, __FILE__, __LINE__);
             return 0;
         }
 
@@ -291,22 +311,10 @@ jboolean handle_udp(const struct arguments *args,
         if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, s->socket, &s->ev))
             log_android(ANDROID_LOG_ERROR, "epoll add udp error %d: %s", errno, strerror(errno));
 
-        s->next = ng_session;
-        ng_session = s;
+        s->next = args->ctx->ng_session;
+        args->ctx->ng_session = s;
 
         cur = s;
-    }
-
-    // Check for DNS
-    if (ntohs(udphdr->dest) == 53) {
-        char qname[DNS_QNAME_MAX + 1];
-        uint16_t qtype;
-        uint16_t qclass;
-        if (get_dns_query(args, &cur->udp, data, datalen, &qtype, &qclass, qname) >= 0) {
-            log_android(ANDROID_LOG_DEBUG,
-                        "DNS query qtype %d qclass %d name %s",
-                        qtype, qclass, qname);
-        }
     }
 
     // Check for DHCP (tethering)
@@ -318,12 +326,12 @@ jboolean handle_udp(const struct arguments *args,
     log_android(ANDROID_LOG_DEBUG, "UDP forward from tun %s/%u to %s/%u data %d",
                 source, ntohs(udphdr->source), dest, ntohs(udphdr->dest), datalen);
 
-    cur->udp.time = time(nullptr);
+    cur->udp.time = time(NULL);
 
     int rversion;
     struct sockaddr_in addr4;
     struct sockaddr_in6 addr6;
-
+    if (redirect == NULL) {
     rversion = cur->udp.version;
     if (cur->udp.version == 4) {
         addr4.sin_family = AF_INET;
@@ -333,10 +341,26 @@ jboolean handle_udp(const struct arguments *args,
         addr6.sin6_family = AF_INET6;
         memcpy(&addr6.sin6_addr, &cur->udp.daddr.ip6, 16);
         addr6.sin6_port = cur->udp.dest;
+        }
+    } else {
+        rversion = (strstr(redirect->raddr, ":") == NULL ? 4 : 6);
+        log_android(ANDROID_LOG_WARN, "UDP%d redirect to %s/%u",
+                    rversion, redirect->raddr, redirect->rport);
+
+        if (rversion == 4) {
+            addr4.sin_family = AF_INET;
+            inet_pton(AF_INET, redirect->raddr, &addr4.sin_addr);
+            addr4.sin_port = htons(redirect->rport);
+        } else {
+            addr6.sin6_family = AF_INET6;
+            inet_pton(AF_INET6, redirect->raddr, &addr6.sin6_addr);
+            addr6.sin6_port = htons(redirect->rport);
+        }
     }
 
     if (sendto(cur->socket, data, (socklen_t) datalen, MSG_NOSIGNAL,
-               (const struct sockaddr *) (rversion == 4 ? (struct sockaddr *)&addr4 : (struct sockaddr *)&addr6),
+               (rversion == 4 ? (const struct sockaddr *) &addr4
+                              : (const struct sockaddr *) &addr6),
                (socklen_t) (rversion == 4 ? sizeof(addr4) : sizeof(addr6))) != datalen) {
         log_android(ANDROID_LOG_ERROR, "UDP sendto error %d: %s", errno, strerror(errno));
         if (errno != EINTR && errno != EAGAIN) {
@@ -353,10 +377,10 @@ int open_udp_socket(const struct arguments *args,
                     const struct udp_session *cur, const struct allowed *redirect) {
     int sock;
     int version;
-    if (redirect == nullptr)
+    if (redirect == NULL)
         version = cur->version;
     else
-        version = (strstr(redirect->raddr, ":") == nullptr ? 4 : 6);
+        version = (strstr(redirect->raddr, ":") == NULL ? 4 : 6);
 
     // Get UDP socket
     sock = socket(version == 4 ? PF_INET : PF_INET6, SOCK_DGRAM, IPPROTO_UDP);
@@ -421,7 +445,7 @@ ssize_t write_udp(const struct arguments *args, const struct udp_session *cur,
     // Build packet
     if (cur->version == 4) {
         len = sizeof(struct iphdr) + sizeof(struct udphdr) + datalen;
-        buffer = static_cast<u_int8_t *>(malloc(len));
+        buffer = ng_malloc(len, "udp write4");
         struct iphdr *ip4 = (struct iphdr *) buffer;
         udp = (struct udphdr *) (buffer + sizeof(struct iphdr));
         if (datalen)
@@ -451,7 +475,7 @@ ssize_t write_udp(const struct arguments *args, const struct udp_session *cur,
         csum = calc_checksum(0, (uint8_t *) &pseudo, sizeof(struct ippseudo));
     } else {
         len = sizeof(struct ip6_hdr) + sizeof(struct udphdr) + datalen;
-        buffer = static_cast<u_int8_t *>(malloc(len));
+        buffer = ng_malloc(len, "udp write6");
         struct ip6_hdr *ip6 = (struct ip6_hdr *) buffer;
         udp = (struct udphdr *) (buffer + sizeof(struct ip6_hdr));
         if (datalen)
@@ -490,9 +514,13 @@ ssize_t write_udp(const struct arguments *args, const struct udp_session *cur,
     udp->check = ~csum;
 
     inet_ntop(cur->version == 4 ? AF_INET : AF_INET6,
-              cur->version == 4 ? (void *)&cur->saddr.ip4 : (void *)&cur->saddr.ip6, source, sizeof(source));
+              (cur->version == 4 ? (const void *) &cur->saddr.ip4 : (const void *) &cur->saddr.ip6),
+              source,
+              sizeof(source));
     inet_ntop(cur->version == 4 ? AF_INET : AF_INET6,
-              cur->version == 4 ? (void *)&cur->daddr.ip4 : (void *)&cur->daddr.ip6, dest, sizeof(dest));
+              (cur->version == 4 ? (const void *) &cur->daddr.ip4 : (const void *) &cur->daddr.ip6),
+              dest,
+              sizeof(dest));
 
     // Send packet
     log_android(ANDROID_LOG_DEBUG,
@@ -501,7 +529,14 @@ ssize_t write_udp(const struct arguments *args, const struct udp_session *cur,
 
     ssize_t res = write(args->tun, buffer, len);
 
-    free(buffer);
+    // Write PCAP record
+    if (res >= 0) {
+        if (pcap_file != NULL)
+            write_pcap_rec(buffer, (size_t) res);
+    } else
+        log_android(ANDROID_LOG_WARN, "UDP write error %d: %s", errno, strerror(errno));
+
+    ng_free(buffer, __FILE__, __LINE__);
 
     if (res != len) {
         log_android(ANDROID_LOG_ERROR, "write %d/%d", res, len);
