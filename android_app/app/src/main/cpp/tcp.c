@@ -798,7 +798,7 @@ jboolean handle_tcp(const struct arguments *args,
             if (s->socket < 0) {
                 // Remote might retry
                 ng_free(s, __FILE__, __LINE__);
-                return 0;
+                return 1;
             }
 
             s->tcp.recv_window = get_receive_window(s);
@@ -842,7 +842,7 @@ jboolean handle_tcp(const struct arguments *args,
             rst.dest = tcphdr->dest;
 
             write_rst(args, &rst);
-            return 0;
+            return 1;
         }
     } else {
         if (rport == 443) {
@@ -862,7 +862,7 @@ jboolean handle_tcp(const struct arguments *args,
                 }
             }
             else {
-                log_android(ANDROID_LOG_WARN, "443 Payload without host name %s", hex(payload, datalen));
+                log_android(ANDROID_LOG_WARN, "443 Payload without host name: %s", hex(payload, datalen));
             }
             if (cur->tcp.http_connect_sent != HTTP_CONNECT_ESTABLISHED) {
                 char session[250];
@@ -874,7 +874,7 @@ jboolean handle_tcp(const struct arguments *args,
                         cur->tcp.remote_seq - cur->tcp.remote_start,
                         cur->tcp.acked - cur->tcp.local_start);
                 queue_tcp(args, tcphdr, session, &cur->tcp, data, datalen);
-                return 0;
+                return 1;
             }
         }
         else {
@@ -894,13 +894,13 @@ jboolean handle_tcp(const struct arguments *args,
         if (cur->tcp.state == TCP_CLOSING || cur->tcp.state == TCP_CLOSE) {
             log_android(ANDROID_LOG_DEBUG, "%s was closed", session);
             write_rst(args, &cur->tcp);
-            return 0;
+            return 1;
         } else {
             int oldstate = cur->tcp.state;
             uint32_t oldlocal = cur->tcp.local_seq;
             uint32_t oldremote = cur->tcp.remote_seq;
 
-            log_android(ANDROID_LOG_VERBOSE, "%s handling", session);
+            log_android(ANDROID_LOG_DEBUG, "%s handling", session);
 
             if (!tcphdr->syn)
                 cur->tcp.time = time(NULL);
@@ -914,12 +914,12 @@ jboolean handle_tcp(const struct arguments *args,
                 if (cur->socket < 0) {
                     log_android(ANDROID_LOG_WARN, "%s data while local closed", session);
                     write_rst(args, &cur->tcp);
-                    return 0;
+                    return 1;
                 }
                 if (cur->tcp.state == TCP_CLOSE_WAIT) {
                     log_android(ANDROID_LOG_WARN, "%s data while remote closed", session);
                     write_rst(args, &cur->tcp);
-                    return 0;
+                    return 1;
                 }
                 queue_tcp(args, tcphdr, session, &cur->tcp, data, datalen);
             }
@@ -929,7 +929,7 @@ jboolean handle_tcp(const struct arguments *args,
                 // http://tools.ietf.org/html/rfc1122#page-87
                 log_android(ANDROID_LOG_VERBOSE, "%s received reset", session);
                 cur->tcp.state = TCP_CLOSING;
-                return 0;
+                return 1;
             } else {
                 if (!tcphdr->ack || ntohl(tcphdr->ack_seq) == cur->tcp.local_seq) {
                     if (tcphdr->syn) {
@@ -955,7 +955,7 @@ jboolean handle_tcp(const struct arguments *args,
                                 cur->tcp.state = TCP_CLOSE;
                         } else {
                             log_android(ANDROID_LOG_ERROR, "%s invalid FIN", session);
-                            return 0;
+                            return 1;
                         }
 
                     } else if (tcphdr->ack) {
@@ -975,11 +975,11 @@ jboolean handle_tcp(const struct arguments *args,
                             // Do nothing
                         } else {
                             log_android(ANDROID_LOG_ERROR, "%s invalid state", session);
-                            return 0;
+                            return 1;
                         }
                     } else {
                         log_android(ANDROID_LOG_ERROR, "%s unknown packet", session);
-                        return 0;
+                        return 1;
                     }
                 } else {
                     uint32_t ack = ntohl(tcphdr->ack_seq);
@@ -1014,7 +1014,7 @@ jboolean handle_tcp(const struct arguments *args,
                     } else {
                         log_android(ANDROID_LOG_VERBOSE, "%s future ACK", session);
                         write_rst(args, &cur->tcp);
-                        return 0;
+                        return 1;
                     }
                 }
             }
