@@ -505,8 +505,6 @@ jobject jniNewObject(JNIEnv *env, jclass cls, jmethodID constructor, const char 
 
 int jniCheckException(JNIEnv *env);
 
-int sdk_int(JNIEnv *env);
-
 void log_android(int prio, const char *fmt, ...);
 
 jint get_uid_q(const struct arguments *args,

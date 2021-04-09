@@ -54,12 +54,6 @@ int compare_u32(uint32_t s1, uint32_t s2) {
         return 1;
 }
 
-int sdk_int(JNIEnv *env) {
-    jclass clsVersion = jniFindClass(env, "android/os/Build$VERSION");
-    jfieldID fid = (*env)->GetStaticFieldID(env, clsVersion, "SDK_INT", "I");
-    return (*env)->GetStaticIntField(env, clsVersion, fid);
-}
-
 void log_android(int prio, const char *fmt, ...) {
     if (prio >= loglevel) {
         va_list args;

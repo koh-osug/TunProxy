@@ -291,28 +291,16 @@ void handle_ip(const struct arguments *args,
                 "Packet v%d %s/%u > %s/%u proto %d flags %s uid %d",
                 version, source, sport, dest, dport, protocol, flags, uid);
 
-    // Check if allowed
-    int allowed = 1;
-
-    // Handle allowed traffic
-    if (allowed) {
-        if (protocol == IPPROTO_ICMP || protocol == IPPROTO_ICMPV6)
-            handle_icmp(args, pkt, length, payload, uid, epoll_fd);
-        else if (protocol == IPPROTO_UDP)
-            handle_udp(args, pkt, length, payload, uid, NULL, epoll_fd);
-        else if (protocol == IPPROTO_TCP) {
-            struct allowed redirect;
-            // always use proxy for TCP
-            strcpy(redirect.raddr, http_proxy_addr);
-            redirect.rport = http_proxy_port;
-            handle_tcp(args, pkt, length, payload, uid, allowed, &redirect, epoll_fd);
-        }
-    } else {
-        if (protocol == IPPROTO_UDP)
-            block_udp(args, pkt, length, payload, uid);
-
-        log_android(ANDROID_LOG_WARN, "Address v%d p%d %s/%u syn %d not allowed",
-                    version, protocol, dest, dport, syn);
+    if (protocol == IPPROTO_ICMP || protocol == IPPROTO_ICMPV6)
+        handle_icmp(args, pkt, length, payload, uid, epoll_fd);
+    else if (protocol == IPPROTO_UDP)
+        handle_udp(args, pkt, length, payload, uid, NULL, epoll_fd);
+    else if (protocol == IPPROTO_TCP) {
+        struct allowed redirect;
+        // always use proxy for TCP
+        strcpy(redirect.raddr, http_proxy_addr);
+        redirect.rport = http_proxy_port;
+        handle_tcp(args, pkt, length, payload, uid, allowed, &redirect, epoll_fd);
     }
 }
 
