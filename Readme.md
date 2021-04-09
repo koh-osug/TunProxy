@@ -1,12 +1,9 @@
-Android HTTP traffic Proxy setting tool
-=============
+# Android HTTP traffic Proxy setting tool
 
-Language/[Japanese](https://github.com/raise-isayan/TunProxy/blob/master/Readme-ja.md)
+This tool is a proxy configuration tool that takes advantage of Android VPNService feature.
+Th communication from specified applications can be proxied.
 
-This tool is a proxy configuration tool that takes advantage of Android VPNService feature. 
-Only the communication from the specified application can be acquired.
-
-## how to use
+## How to use
 
 When you start the TunProxy application, the following screen will be launched.
 
@@ -21,7 +18,7 @@ When you start the TunProxy application, the following screen will be launched.
 * [Stop] button
   * Stop the VPN service.
 
-## menu
+## Menu
 
 Application settings can be made from the menu icon (![Menu](images/Menu.png)) at the top of the screen.
 
@@ -82,16 +79,12 @@ To perform SSL decryption, set the IP of an SSL decryptable proxy such as Burp s
 
 The following are local proxy tools that can decrypt SSL.
 
-* Burp suite
-  * https://portswigger.net/burp
+* [Burp suite](https://portswigger.net/burp)
+* [Fiddler](https://www.telerik.com/fiddler)
+* [ZAP Proxy](https://www.owasp.org/index.php/OWASP_Zed_Attack_Proxy_Project)
+* [LittleProxy MITM](https://github.com/koh-osug/LittleProxy-mitm)
 
-* Fiddler
-  * https://www.telerik.com/fiddler
-
-* ZAP Proxy
-  * https://www.owasp.org/index.php/OWASP_Zed_Attack_Proxy_Project
-
-To decrypt SSL, install the local proxy tool Root certificate in the Android device user certificate.
+To decrypt SSL, install the local proxy tool CA certificate in the Android device user certificate.
 However, in Android 7.0 and later, the application no longer trusts user certificates by default.
 
 * https://android-developers.googleblog.com/2016/07/changes-to-trusted-certificate.html
@@ -100,25 +93,24 @@ Please refer to the following web site as a solution
 
 * Android 7 Nougat and certificate authorities
   * https://blog.jeroenhd.nl/article/android-7-nougat-and-certificate-authorities
+* An alternative is using [apktool](https://ibotpeaches.github.io/Apktool/), including a network security configuration and repackage and sign the application.
 
 ### About
+
 Display application version
 
 ## Operating environment
 
 * Android 5.0 (API Level 21) or later
 
-### ビルド
- gradlew build
+### Build
 
-## base application
+~~~shell
+./gradlew build
+ ~~~~
+
+## Base application
 
 Most of the code was created based on the following applications for creating applications.
 
-* forked from MengAndy/tun2http
-  * https://github.com/MengAndy/tun2http/
-
-## Development environment
-
-* JRE(JDK) 1.8 or later(Open JDK)
-* AndroidStudio 3.6.1 (https://developer.android.com/studio/index.html)
+  * [NetGuard](https://github.com/M66B/NetGuard)

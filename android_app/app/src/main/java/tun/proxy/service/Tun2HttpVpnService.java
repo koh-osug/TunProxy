@@ -1,9 +1,11 @@
 package tun.proxy.service;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
 import android.net.VpnService;
 import android.os.Binder;
 import android.os.Build;
@@ -11,15 +13,16 @@ import android.os.IBinder;
 import android.os.Parcel;
 import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
+import android.os.Process;
 import android.os.RemoteException;
 
-import androidx.annotation.NonNull;
 import androidx.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -32,11 +35,15 @@ import tun.utils.Util;
 public class Tun2HttpVpnService extends VpnService {
     public static final String PREF_PROXY_HOST = "pref_proxy_host";
     public static final String PREF_PROXY_PORT = "pref_proxy_port";
+    public static final String PREF_LOG_LEVEL = "pref_log_level";
     public static final String PREF_RUNNING = "pref_running";
     private static final String TAG = "Tun2Http.Service";
     private static final String ACTION_START = "start";
     private static final String ACTION_STOP = "stop";
     private static volatile PowerManager.WakeLock wlInstance = null;
+
+    private long jniContext;
+    private Thread tunnelThread = null;
 
     static {
         System.loadLibrary("tun2http");
@@ -66,15 +73,42 @@ public class Tun2HttpVpnService extends VpnService {
         context.startService(intent);
     }
 
-    private native void jni_init();
+    private native long jni_init(int sdk);
 
-    private native void jni_start(int tun, boolean fwd53, int rcode, String proxyIp, int proxyPort);
+    private native void jni_start(long context, int logLevel);
 
-    private native void jni_stop(int tun);
+    private native void jni_stop(long context);
+
+    private native void jni_clear(long context);
 
     private native int jni_get_mtu();
 
-    private native void jni_done();
+    private native void jni_done(long context);
+
+    private native void jni_run(long context, int tun, boolean fwd53, int rcode);
+
+    private native void jni_socks5(String addr, int port, String username, String password);
+
+    private native void jni_http_proxy(String proxyIp, int proxyPort);
+
+    // Called from native code
+    @TargetApi(Build.VERSION_CODES.Q)
+    private int getUidQ(int version, int protocol, String saddr, int sport, String daddr, int dport) {
+        if (protocol != 6 /* TCP */ && protocol != 17 /* UDP */)
+            return Process.INVALID_UID;
+
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (cm == null)
+            return Process.INVALID_UID;
+
+        InetSocketAddress local = new InetSocketAddress(saddr, sport);
+        InetSocketAddress remote = new InetSocketAddress(daddr, dport);
+
+        Log.i(TAG, "Get uid local=" + local + " remote=" + remote);
+        int uid = cm.getConnectionOwnerUid(protocol, local, remote);
+        Log.i(TAG, "Get uid=" + uid);
+        return uid;
+    }
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -177,27 +211,63 @@ public class Tun2HttpVpnService extends VpnService {
         return builder;
     }
 
-    private void startNative(ParcelFileDescriptor vpn) {
+    private void startNative(final ParcelFileDescriptor vpn) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String proxyHost = prefs.getString(PREF_PROXY_HOST, "");
         int proxyPort = prefs.getInt(PREF_PROXY_PORT, 0);
+        int logLevel = Integer.parseInt(prefs.getString(PREF_LOG_LEVEL, Integer.toString(Log.VERBOSE)));
         if (proxyPort != 0 && !TextUtils.isEmpty(proxyHost)) {
-            jni_start(vpn.getFd(), false, 3, proxyHost, proxyPort);
-
+            jni_http_proxy(proxyHost, proxyPort);
             prefs.edit().putBoolean(PREF_RUNNING, true).apply();
+            if (tunnelThread == null) {
+                Log.i(TAG, "Starting tunnel thread context=" + jniContext);
+                jni_start(jniContext, logLevel);
+
+                tunnelThread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.i(TAG, "Running tunnel context=" + jniContext);
+                        try {
+                            jni_run(jniContext, vpn.getFd(), false, 3);
+                        }
+                        catch (Throwable e) {
+                            Log.e(TAG, "Tunnel thread raised exception.", e);
+                        }
+                        Log.i(TAG, "Tunnel exited");
+                        tunnelThread = null;
+                    }
+                });
+                tunnelThread.start();
+                Log.i(TAG, "Started tunnel thread");
+            }
+
         }
     }
 
     private void stopNative(ParcelFileDescriptor vpn) {
-        try {
-            jni_stop(vpn.getFd());
+        Log.i(TAG, "Stop native");
 
-        } catch (Throwable ex) {
-            // File descriptor might be closed
-            Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
-            jni_stop(-1);
+        if (tunnelThread != null) {
+            Log.i(TAG, "Stopping tunnel thread");
+
+            jni_stop(jniContext);
+
+            Thread thread = tunnelThread;
+            while (thread != null && thread.isAlive()) {
+                try {
+                    Log.i(TAG, "Joining tunnel thread context=" + jniContext);
+                    thread.join();
+                } catch (InterruptedException ignored) {
+                    Log.i(TAG, "Joined tunnel interrupted");
+                }
+                thread = tunnelThread;
+            }
+            tunnelThread = null;
+
+            jni_clear(jniContext);
+
+            Log.i(TAG, "Stopped tunnel thread");
         }
-
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         prefs.edit().putBoolean(PREF_RUNNING, false).apply();
     }
@@ -211,20 +281,6 @@ public class Tun2HttpVpnService extends VpnService {
         }
     }
 
-    // Called from native code
-    private void nativeExit(String reason) {
-        Log.w(TAG, "Native exit reason=" + reason);
-        if (reason != null) {
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-            prefs.edit().putBoolean("enabled", false).apply();
-        }
-    }
-
-    // Called from native code
-    private void nativeError(int error, String message) {
-        Log.w(TAG, "Native error " + error + ": " + message);
-    }
-
     private boolean isSupported(int protocol) {
         return (protocol == 1 /* ICMPv4 */ ||
                 protocol == 59 /* ICMPv6 */ ||
@@ -235,7 +291,7 @@ public class Tun2HttpVpnService extends VpnService {
     @Override
     public void onCreate() {
         // Native init
-        jni_init();
+        jniContext = jni_init(Build.VERSION.SDK_INT);
         super.onCreate();
 
     }
@@ -271,8 +327,7 @@ public class Tun2HttpVpnService extends VpnService {
             Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
         }
 
-        jni_done();
-
+        jni_done(jniContext);
         super.onDestroy();
     }
 

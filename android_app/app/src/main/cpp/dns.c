@@ -145,9 +145,8 @@ void parse_dns_response(const struct arguments *args, const struct ng_session *s
                             inet_ntop(AF_INET6, data + off, rd, sizeof(rd));
                             else
                                 return;
-                    }
+                        }
 
-                        dns_resolved(args, qname, name, rd, ttl);
                         log_android(ANDROID_LOG_DEBUG,
                                     "DNS answer %d qname %s qtype %d ttl %d data %s",
                                     a, name, qtype, ttl, rd);
@@ -169,62 +168,8 @@ void parse_dns_response(const struct arguments *args, const struct ng_session *s
                             "DNS response A invalid off %d datalen %d", off, *datalen);
                 return;
             }
-	}
+	    }
 
-        if (qcount > 0 && is_domain_blocked(args, qname)) {
-            dns->qr = 1;
-            dns->aa = 0;
-            dns->tc = 0;
-            dns->rd = 0;
-            dns->ra = 0;
-            dns->z = 0;
-            dns->ad = 0;
-            dns->cd = 0;
-            dns->rcode = (uint16_t) args->rcode;
-            dns->ans_count = 0;
-            dns->auth_count = 0;
-            dns->add_count = 0;
-            *datalen = aoff;
-
-            int version;
-            char source[INET6_ADDRSTRLEN + 1];
-            char dest[INET6_ADDRSTRLEN + 1];
-            uint16_t sport;
-            uint16_t dport;
-
-            if (s->protocol == IPPROTO_UDP) {
-                version = s->udp.version;
-                sport = ntohs(s->udp.source);
-                dport = ntohs(s->udp.dest);
-                if (s->udp.version == 4) {
-                    inet_ntop(AF_INET, &s->udp.saddr.ip4, source, sizeof(source));
-                    inet_ntop(AF_INET, &s->udp.daddr.ip4, dest, sizeof(dest));
-                } else {
-                    inet_ntop(AF_INET6, &s->udp.saddr.ip6, source, sizeof(source));
-                    inet_ntop(AF_INET6, &s->udp.daddr.ip6, dest, sizeof(dest));
-        }
-            } else {
-                version = s->tcp.version;
-                sport = ntohs(s->tcp.source);
-                dport = ntohs(s->tcp.dest);
-                if (s->tcp.version == 4) {
-                    inet_ntop(AF_INET, &s->tcp.saddr.ip4, source, sizeof(source));
-                    inet_ntop(AF_INET, &s->tcp.daddr.ip4, dest, sizeof(dest));
-                } else {
-                    inet_ntop(AF_INET6, &s->tcp.saddr.ip6, source, sizeof(source));
-                    inet_ntop(AF_INET6, &s->tcp.daddr.ip6, dest, sizeof(dest));
-                }
-    }
-
-            // Log qname
-            char name[DNS_QNAME_MAX + 40 + 1];
-            sprintf(name, "qtype %d qname %s rcode %d", qtype, qname, dns->rcode);
-            jobject objPacket = create_packet(
-                    args, version, s->protocol, "",
-                    source, sport, dest, dport,
-                    name, 0, 0);
-            log_packet(args, objPacket);
-        }
     } else if (acount > 0)
         log_android(ANDROID_LOG_WARN,
                     "DNS response qr %d opcode %d qcount %d acount %d",

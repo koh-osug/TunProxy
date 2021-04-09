@@ -28,12 +28,10 @@ char socks5_addr[INET6_ADDRSTRLEN + 1];
 int socks5_port = 0;
 char socks5_username[127 + 1];
 char socks5_password[127 + 1];
-int loglevel = ANDROID_LOG_WARN;
+int loglevel = ANDROID_LOG_INFO;
 
 char http_proxy_addr[INET6_ADDRSTRLEN];
 int http_proxy_port = 0;
-char http_proxy_username[127 + 1];
-char http_proxy_password[127 + 1];
 
 extern int max_tun_msg;
 
@@ -88,7 +86,7 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1init(
     struct context *ctx = ng_calloc(1, sizeof(struct context), "init");
     ctx->sdk = sdk;
 
-    loglevel = ANDROID_LOG_WARN;
+    loglevel = ANDROID_LOG_INFO;
 
     *socks5_addr = NULL;
     socks5_port = 0;
@@ -124,7 +122,7 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1start(
     max_tun_msg = 0;
     ctx->stopping = 0;
 
-    log_android(ANDROID_LOG_INFO, "Starting level %d", loglevel);
+    log_android(ANDROID_LOG_INFO, "Starting with log level %d", loglevel);
 
 }
 
@@ -133,7 +131,7 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1run(
         JNIEnv *env, jobject instance, jlong context, jint tun, jboolean fwd53, jint rcode) {
     struct context *ctx = (struct context *) context;
 
-    log_android(ANDROID_LOG_WARN, "Running tun %d fwd53 %d level %d", tun, fwd53, loglevel);
+    log_android(ANDROID_LOG_INFO, "Running tun %d fwd53 %d log level %d", tun, fwd53, loglevel);
 
     // Set blocking
     int flags = fcntl(tun, F_GETFL, 0);
@@ -153,30 +151,19 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1run(
 }
 
 JNIEXPORT void JNICALL
-Java_tun_proxy_service_Tun2HttpVpnService_jni_1http_proxy(JNIEnv *env, jobject instance, jstring addr_,
-                                                      jint port, jstring username_,
-                                                      jstring password_) {
+Java_tun_proxy_service_Tun2HttpVpnService_jni_1http_1proxy(JNIEnv *env, jobject instance, jstring addr_,
+                                                           jint port) {
     const char *addr = (*env)->GetStringUTFChars(env, addr_, 0);
-    const char *username = (*env)->GetStringUTFChars(env, username_, 0);
-    const char *password = (*env)->GetStringUTFChars(env, password_, 0);
     ng_add_alloc(addr, "addr");
-    ng_add_alloc(username, "username");
-    ng_add_alloc(password, "password");
 
     strcpy(http_proxy_addr, addr);
-    strcpy(http_proxy_username, username);
-    strcpy(http_proxy_password, password);
     http_proxy_port = port;
 
-    log_android(ANDROID_LOG_INFO, "HTTP Proxy %s:%d user=%s",
-                http_proxy_addr, http_proxy_port, http_proxy_username);
+    log_android(ANDROID_LOG_INFO, "HTTP Proxy %s:%d",
+                http_proxy_addr, http_proxy_port);
 
     (*env)->ReleaseStringUTFChars(env, addr_, addr);
-    (*env)->ReleaseStringUTFChars(env, username_, username);
-    (*env)->ReleaseStringUTFChars(env, password_, password);
     ng_delete_alloc(addr, __FILE__, __LINE__);
-    ng_delete_alloc(username, __FILE__, __LINE__);
-    ng_delete_alloc(password, __FILE__, __LINE__);
 }
 
 JNIEXPORT void JNICALL
@@ -200,54 +187,6 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1clear(
 JNIEXPORT jint JNICALL
 Java_tun_proxy_service_Tun2HttpVpnService_jni_1get_1mtu(JNIEnv *env, jobject instance) {
     return get_mtu();
-}
-
-JNIEXPORT jintArray JNICALL
-Java_tun_proxy_service_Tun2HttpVpnService_jni_1get_1stats(
-        JNIEnv *env, jobject instance, jlong context) {
-    struct context *ctx = (struct context *) context;
-
-    if (pthread_mutex_lock(&ctx->lock))
-        log_android(ANDROID_LOG_ERROR, "pthread_mutex_lock failed");
-
-    jintArray jarray = (*env)->NewIntArray(env, 5);
-    jint *jcount = (*env)->GetIntArrayElements(env, jarray, NULL);
-
-    struct ng_session *s = ctx->ng_session;
-    while (s != NULL) {
-        if (s->protocol == IPPROTO_ICMP || s->protocol == IPPROTO_ICMPV6) {
-            if (!s->icmp.stop)
-                jcount[0]++;
-        } else if (s->protocol == IPPROTO_UDP) {
-            if (s->udp.state == UDP_ACTIVE)
-                jcount[1]++;
-        } else if (s->protocol == IPPROTO_TCP) {
-            if (s->tcp.state != TCP_CLOSING && s->tcp.state != TCP_CLOSE)
-                jcount[2]++;
-        }
-        s = s->next;
-    }
-
-    if (pthread_mutex_unlock(&ctx->lock))
-        log_android(ANDROID_LOG_ERROR, "pthread_mutex_unlock failed");
-
-    jcount[3] = 0;
-    DIR *d = opendir("/proc/self/fd");
-    if (d) {
-        struct dirent *dir;
-        while ((dir = readdir(d)) != NULL)
-            if (dir->d_type != DT_DIR)
-                jcount[3]++;
-        closedir(d);
-    }
-
-    struct rlimit rlim;
-    memset(&rlim, 0, sizeof(struct rlimit));
-    getrlimit(RLIMIT_NOFILE, &rlim);
-    jcount[4] = (jint) rlim.rlim_cur;
-
-    (*env)->ReleaseIntArrayElements(env, jarray, jcount, 0);
-    return jarray;
 }
 
 JNIEXPORT void JNICALL
@@ -462,6 +401,53 @@ int jniCheckException(JNIEnv *env) {
         return 1;
     }
     return 0;
+}
+
+static jmethodID midGetUidQ = NULL;
+
+jint get_uid_q(const struct arguments *args,
+               jint version, jint protocol,
+               const char *source, jint sport,
+               const char *dest, jint dport) {
+#ifdef PROFILE_JNI
+    float mselapsed;
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+#endif
+
+    jclass clsService = (*args->env)->GetObjectClass(args->env, args->instance);
+    ng_add_alloc(clsService, "clsService");
+
+    const char *signature = "(IILjava/lang/String;ILjava/lang/String;I)I";
+    if (midGetUidQ == NULL)
+        midGetUidQ = jniGetMethodID(args->env, clsService, "getUidQ", signature);
+
+    jstring jsource = (*args->env)->NewStringUTF(args->env, source);
+    jstring jdest = (*args->env)->NewStringUTF(args->env, dest);
+    ng_add_alloc(jsource, "jsource");
+    ng_add_alloc(jdest, "jdest");
+
+    jint juid = (*args->env)->CallIntMethod(
+            args->env, args->instance, midGetUidQ,
+            version, protocol, jsource, sport, jdest, dport);
+    jniCheckException(args->env);
+
+    (*args->env)->DeleteLocalRef(args->env, jdest);
+    (*args->env)->DeleteLocalRef(args->env, jsource);
+    (*args->env)->DeleteLocalRef(args->env, clsService);
+    ng_delete_alloc(jdest, __FILE__, __LINE__);
+    ng_delete_alloc(jsource, __FILE__, __LINE__);
+    ng_delete_alloc(clsService, __FILE__, __LINE__);
+
+#ifdef PROFILE_JNI
+    gettimeofday(&end, NULL);
+    mselapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
+                (end.tv_usec - start.tv_usec) / 1000.0;
+    if (mselapsed > PROFILE_JNI)
+        log_android(ANDROID_LOG_WARN, "get_uid_q %f", mselapsed);
+#endif
+
+    return juid;
 }
 
 struct alloc_record {

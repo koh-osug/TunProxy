@@ -68,9 +68,9 @@
 #define SESSION_LIMIT 40 // percent
 #define SESSION_MAX (1024 * SESSION_LIMIT / 100) // number
 
-#define TCP_CONNECT_NOT_SENT -1
-#define TCP_CONNECT_SENT 0
-#define TCP_CONNECT_ESTABLISHED 1
+#define HTTP_CONNECT_NOT_SENT -1
+#define HTTP_CONNECT_SENT 0
+#define HTTP_CONNECT_ESTABLISHED 1
 
 #define SEND_BUF_DEFAULT 163840 // bytes
 
@@ -97,6 +97,11 @@ struct arguments {
     jboolean fwd53;
     jint rcode;
     struct context *ctx;
+};
+
+struct allowed {
+    char raddr[INET6_ADDRSTRLEN + 1];
+    uint16_t rport; // host notation
 };
 
 struct segment {
@@ -196,7 +201,7 @@ struct tcp_session {
     struct segment *forward;
 
     char hostname[512];
-    int connect_sent;
+    int http_connect_sent;
 };
 
 struct ng_session {
@@ -340,12 +345,6 @@ typedef struct dhcp_option {
 void handle_signal(int sig, siginfo_t *info, void *context);
 
 void *handle_events(void *a);
-
-void report_exit(const struct arguments *args, const char *fmt, ...);
-
-void report_error(const struct arguments *args, jint error, const char *fmt, ...);
-
-void check_allowed(const struct arguments *args);
 
 void init(const struct arguments *args);
 
@@ -510,13 +509,6 @@ int sdk_int(JNIEnv *env);
 
 void log_android(int prio, const char *fmt, ...);
 
-void log_packet(const struct arguments *args, jobject jpacket);
-
-void dns_resolved(const struct arguments *args,
-                  const char *qname, const char *aname, const char *resource, int ttl);
-
-jboolean is_domain_blocked(const struct arguments *args, const char *name);
-
 jint get_uid_q(const struct arguments *args,
                jint version,
                jint protocol,
@@ -524,8 +516,6 @@ jint get_uid_q(const struct arguments *args,
                jint sport,
                const char *dest,
                jint dport);
-
-struct allowed *is_address_allowed(const struct arguments *args, jobject objPacket);
 
 void write_pcap_hdr();
 

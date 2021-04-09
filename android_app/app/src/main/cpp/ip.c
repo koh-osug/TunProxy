@@ -23,6 +23,9 @@ int max_tun_msg = 0;
 extern int loglevel;
 extern FILE *pcap_file;
 
+extern char http_proxy_addr[INET6_ADDRSTRLEN + 1];
+extern int http_proxy_port;
+
 uint16_t get_mtu() {
     return 10000;
 }
@@ -44,10 +47,7 @@ int check_tun(const struct arguments *args,
         if (fcntl(args->tun, F_GETFL) < 0) {
             log_android(ANDROID_LOG_ERROR, "fcntl tun %d F_GETFL error %d: %s",
                         args->tun, errno, strerror(errno));
-            report_exit(args, "fcntl tun %d F_GETFL error %d: %s",
-                        args->tun, errno, strerror(errno));
-        } else
-            report_exit(args, "tun %d exception", args->tun);
+        }
         return -1;
     }
 
@@ -64,8 +64,6 @@ int check_tun(const struct arguments *args,
                 // Retry later
                 return 0;
             else {
-                report_exit(args, "tun %d read error %d: %s",
-                            args->tun, errno, strerror(errno));
                 return -1;
             }
         } else if (length > 0) {
@@ -75,7 +73,7 @@ int check_tun(const struct arguments *args,
 
             if (length > max_tun_msg) {
                 max_tun_msg = length;
-                log_android(ANDROID_LOG_WARN, "Maximum tun msg length %d", max_tun_msg);
+                log_android(ANDROID_LOG_INFO, "Maximum tun msg length %d", max_tun_msg);
             }
 
             // Handle IP from tun
@@ -87,7 +85,6 @@ int check_tun(const struct arguments *args,
             ng_free(buffer, __FILE__, __LINE__);
 
             log_android(ANDROID_LOG_ERROR, "tun %d empty read", args->tun);
-            report_exit(args, "tun %d empty read", args->tun);
             return -1;
         }
     }
@@ -285,7 +282,7 @@ void handle_ip(const struct arguments *args,
         (protocol == IPPROTO_UDP && !has_udp_session(args, pkt, payload)) ||
         (protocol == IPPROTO_TCP && syn)) {
         if (args->ctx->sdk <= 28) // Android 9 Pie
-        uid = get_uid(version, protocol, saddr, sport, daddr, dport);
+            uid = get_uid(version, protocol, saddr, sport, daddr, dport);
         else
             uid = get_uid_q(args, version, protocol, source, sport, dest, dport);
     }
@@ -295,29 +292,21 @@ void handle_ip(const struct arguments *args,
                 version, source, sport, dest, dport, protocol, flags, uid);
 
     // Check if allowed
-    int allowed = 0;
-    struct allowed *redirect = NULL;
-    if (protocol == IPPROTO_UDP && has_udp_session(args, pkt, payload))
-        allowed = 1; // could be a lingering/blocked session
-    else if (protocol == IPPROTO_TCP && (!syn || (uid == 0 && dport == 53)))
-        allowed = 1; // assume existing session
-    else {
-        jobject objPacket = create_packet(
-                args, version, protocol, flags, source, sport, dest, dport, data, uid, 0);
-        redirect = is_address_allowed(args, objPacket);
-        allowed = (redirect != NULL);
-        if (redirect != NULL && (*redirect->raddr == 0 || redirect->rport == 0))
-            redirect = NULL;
-    }
+    int allowed = 1;
 
     // Handle allowed traffic
     if (allowed) {
-    if (protocol == IPPROTO_ICMP || protocol == IPPROTO_ICMPV6)
-        handle_icmp(args, pkt, length, payload, uid, epoll_fd);
-    else if (protocol == IPPROTO_UDP)
-            handle_udp(args, pkt, length, payload, uid, redirect, epoll_fd);
-        else if (protocol == IPPROTO_TCP)
-            handle_tcp(args, pkt, length, payload, uid, allowed, redirect, epoll_fd);
+        if (protocol == IPPROTO_ICMP || protocol == IPPROTO_ICMPV6)
+            handle_icmp(args, pkt, length, payload, uid, epoll_fd);
+        else if (protocol == IPPROTO_UDP)
+            handle_udp(args, pkt, length, payload, uid, NULL, epoll_fd);
+        else if (protocol == IPPROTO_TCP) {
+            struct allowed redirect;
+            // always use proxy for TCP
+            strcpy(redirect.raddr, http_proxy_addr);
+            redirect.rport = http_proxy_port;
+            handle_tcp(args, pkt, length, payload, uid, allowed, &redirect, epoll_fd);
+        }
     } else {
         if (protocol == IPPROTO_UDP)
             block_udp(args, pkt, length, payload, uid);

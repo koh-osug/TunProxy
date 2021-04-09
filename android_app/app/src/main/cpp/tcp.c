@@ -18,16 +18,12 @@
 */
 
 #include "netguard.h"
+#include "tls.h"
 
 extern char socks5_addr[INET6_ADDRSTRLEN + 1];
 extern int socks5_port;
 extern char socks5_username[127 + 1];
 extern char socks5_password[127 + 1];
-
-extern char http_proxy_addr[INET6_ADDRSTRLEN + 1];
-extern int http_proxy_port;
-extern char http_proxy_username[127 + 1];
-extern char http_proxy_password[127 + 1];
 
 extern FILE *pcap_file;
 
@@ -656,11 +652,7 @@ jboolean handle_tcp(const struct arguments *args,
     parse_tls_header((const char *) data, datalen, hostname);
     int len = strlen(hostname);
 
-
     int rport = htons(tcphdr->dest);
-
-    strcpy(redirect->raddr, http_proxy_addr);
-    redirect->rport = http_proxy_port;
 
     // Search session
     struct ng_session *cur = args->ctx->ng_session;
@@ -769,9 +761,9 @@ jboolean handle_tcp(const struct arguments *args,
             s->tcp.last_keep_alive = 0;
             s->tcp.sent = 0;
             s->tcp.received = 0;
-            s->tcp.connect_sent = TCP_CONNECT_NOT_SENT;
+            s->tcp.http_connect_sent = HTTP_CONNECT_NOT_SENT;
             if (rport == 80) {
-                s->tcp.connect_sent = TCP_CONNECT_ESTABLISHED;
+                s->tcp.http_connect_sent = HTTP_CONNECT_ESTABLISHED;
             }
 
             if (version == 4) {
@@ -856,9 +848,7 @@ jboolean handle_tcp(const struct arguments *args,
         if (rport == 443) {
             if (len > 0) {
                 strcpy(cur->tcp.hostname, hostname);
-            }
-            if (cur->tcp.connect_sent == TCP_CONNECT_NOT_SENT) {
-                if (len > 0) {
+                if (cur->tcp.http_connect_sent == HTTP_CONNECT_NOT_SENT) {
                     char buffer[512];
                     sprintf(buffer, "CONNECT %s:443 HTTP/1.0\r\n\r\n", cur->tcp.hostname);
 
@@ -866,12 +856,15 @@ jboolean handle_tcp(const struct arguments *args,
                     if (sent < 0) {
                         write_rst(args, &cur->tcp);
                     } else {
-                        cur->tcp.connect_sent = TCP_CONNECT_SENT;
+                        cur->tcp.http_connect_sent = HTTP_CONNECT_SENT;
                         cur->tcp.state = TCP_LISTEN;
                     }
                 }
             }
-            if (cur->tcp.connect_sent != TCP_CONNECT_ESTABLISHED) {
+            else {
+                log_android(ANDROID_LOG_WARN, "443 Payload without host name %s", hex(payload, datalen));
+            }
+            if (cur->tcp.http_connect_sent != HTTP_CONNECT_ESTABLISHED) {
                 char session[250];
                 sprintf(session,
                         "%s %s loc %u rem %u acked %u",
@@ -883,6 +876,9 @@ jboolean handle_tcp(const struct arguments *args,
                 queue_tcp(args, tcphdr, session, &cur->tcp, data, datalen);
                 return 0;
             }
+        }
+        else {
+            log_android(ANDROID_LOG_WARN, "No 443 Payload %s", hex(payload, datalen));
         }
 
         char session[250];
@@ -1168,7 +1164,7 @@ int open_tcp_socket(const struct arguments *args,
             }
         }
     } else {
-        log_android(ANDROID_LOG_VERBOSE, "TCP%d redirect to %s/%u",
+        log_android(ANDROID_LOG_DEBUG, "TCP%d redirect to %s/%u",
                     version, redirect->raddr, redirect->rport);
 
         if (version == 4) {

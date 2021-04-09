@@ -332,19 +332,19 @@ jboolean handle_udp(const struct arguments *args,
     struct sockaddr_in addr4;
     struct sockaddr_in6 addr6;
     if (redirect == NULL) {
-    rversion = cur->udp.version;
-    if (cur->udp.version == 4) {
-        addr4.sin_family = AF_INET;
-        addr4.sin_addr.s_addr = (__be32) cur->udp.daddr.ip4;
-        addr4.sin_port = cur->udp.dest;
-    } else {
-        addr6.sin6_family = AF_INET6;
-        memcpy(&addr6.sin6_addr, &cur->udp.daddr.ip6, 16);
-        addr6.sin6_port = cur->udp.dest;
+        rversion = cur->udp.version;
+        if (cur->udp.version == 4) {
+            addr4.sin_family = AF_INET;
+            addr4.sin_addr.s_addr = (__be32) cur->udp.daddr.ip4;
+            addr4.sin_port = cur->udp.dest;
+        } else {
+            addr6.sin6_family = AF_INET6;
+            memcpy(&addr6.sin6_addr, &cur->udp.daddr.ip6, 16);
+            addr6.sin6_port = cur->udp.dest;
         }
     } else {
         rversion = (strstr(redirect->raddr, ":") == NULL ? 4 : 6);
-        log_android(ANDROID_LOG_WARN, "UDP%d redirect to %s/%u",
+        log_android(ANDROID_LOG_DEBUG, "UDP%d redirect to %s/%u",
                     rversion, redirect->raddr, redirect->rport);
 
         if (rversion == 4) {
