@@ -482,12 +482,6 @@ void check_tcp_socket(const struct arguments *args,
                     size_t len = s->tcp.forward->len - s->tcp.forward->sent;
                     size_t newlen = len;
                     uint8_t *new_data = 0;
-                    if (htons(s->tcp.dest) == 80) {
-                        new_data = patch_http_url(data, &newlen);
-                        if (new_data) {
-                            data = new_data;
-                        }
-                    }
                     ssize_t sent = send(s->socket,
                                         s->tcp.forward->data + s->tcp.forward->sent,
                                         s->tcp.forward->len - s->tcp.forward->sent,
@@ -648,12 +642,6 @@ jboolean handle_tcp(const struct arguments *args,
     const uint8_t *data = payload + sizeof(struct tcphdr) + tcpoptlen;
     const uint16_t datalen = (const uint16_t) (length - (data - pkt));
 
-    char hostname[512] = "";
-    parse_tls_header((const char *) data, datalen, hostname);
-    int len = strlen(hostname);
-
-    int rport = htons(tcphdr->dest);
-
     // Search session
     struct ng_session *cur = args->ctx->ng_session;
     while (cur != NULL &&
@@ -761,10 +749,6 @@ jboolean handle_tcp(const struct arguments *args,
             s->tcp.last_keep_alive = 0;
             s->tcp.sent = 0;
             s->tcp.received = 0;
-            s->tcp.http_connect_sent = HTTP_CONNECT_NOT_SENT;
-            if (rport == 80) {
-                s->tcp.http_connect_sent = HTTP_CONNECT_ESTABLISHED;
-            }
 
             if (version == 4) {
                 s->tcp.saddr.ip4 = (__be32) ip4->saddr;
@@ -777,7 +761,7 @@ jboolean handle_tcp(const struct arguments *args,
             s->tcp.source = tcphdr->source;
             s->tcp.dest = tcphdr->dest;
             s->tcp.state = TCP_LISTEN;
-            // s->tcp.socks5 = SOCKS5_NONE;
+            s->tcp.socks5 = SOCKS5_NONE;
             s->tcp.forward = NULL;
             s->next = NULL;
 
@@ -845,42 +829,6 @@ jboolean handle_tcp(const struct arguments *args,
             return 1;
         }
     } else {
-        if (rport == 443) {
-            if (len > 0) {
-                strcpy(cur->tcp.hostname, hostname);
-                if (cur->tcp.http_connect_sent == HTTP_CONNECT_NOT_SENT) {
-                    char buffer[512];
-                    sprintf(buffer, "CONNECT %s:443 HTTP/1.0\r\n\r\n", cur->tcp.hostname);
-
-                    ssize_t sent = send(cur->socket, buffer, strlen(buffer), MSG_NOSIGNAL);
-                    if (sent < 0) {
-                        write_rst(args, &cur->tcp);
-                    } else {
-                        cur->tcp.http_connect_sent = HTTP_CONNECT_SENT;
-                        cur->tcp.state = TCP_LISTEN;
-                    }
-                }
-            }
-            else {
-                log_android(ANDROID_LOG_WARN, "443 Payload without host name: %s", hex(payload, datalen));
-            }
-            if (cur->tcp.http_connect_sent != HTTP_CONNECT_ESTABLISHED) {
-                char session[250];
-                sprintf(session,
-                        "%s %s loc %u rem %u acked %u",
-                        packet,
-                        strstate(cur->tcp.state),
-                        cur->tcp.local_seq - cur->tcp.local_start,
-                        cur->tcp.remote_seq - cur->tcp.remote_start,
-                        cur->tcp.acked - cur->tcp.local_start);
-                queue_tcp(args, tcphdr, session, &cur->tcp, data, datalen);
-                return 1;
-            }
-        }
-        else {
-            log_android(ANDROID_LOG_WARN, "No 443 Payload %s", hex(payload, datalen));
-        }
-
         char session[250];
         sprintf(session,
                 "%s %s loc %u rem %u acked %u",

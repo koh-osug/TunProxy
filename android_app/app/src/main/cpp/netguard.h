@@ -68,10 +68,6 @@
 #define SESSION_LIMIT 40 // percent
 #define SESSION_MAX (1024 * SESSION_LIMIT / 100) // number
 
-#define HTTP_CONNECT_NOT_SENT -1
-#define HTTP_CONNECT_SENT 0
-#define HTTP_CONNECT_ESTABLISHED 1
-
 #define SEND_BUF_DEFAULT 163840 // bytes
 
 #define UID_MAX_AGE 30000 // milliseconds
@@ -199,9 +195,6 @@ struct tcp_session {
     uint8_t state;
     uint8_t socks5;
     struct segment *forward;
-
-    char hostname[512];
-    int http_connect_sent;
 };
 
 struct ng_session {

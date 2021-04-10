@@ -151,22 +151,6 @@ Java_tun_proxy_service_Tun2HttpVpnService_jni_1run(
 }
 
 JNIEXPORT void JNICALL
-Java_tun_proxy_service_Tun2HttpVpnService_jni_1http_1proxy(JNIEnv *env, jobject instance, jstring addr_,
-                                                           jint port) {
-    const char *addr = (*env)->GetStringUTFChars(env, addr_, 0);
-    ng_add_alloc(addr, "addr");
-
-    strcpy(http_proxy_addr, addr);
-    http_proxy_port = port;
-
-    log_android(ANDROID_LOG_INFO, "HTTP Proxy %s:%d",
-                http_proxy_addr, http_proxy_port);
-
-    (*env)->ReleaseStringUTFChars(env, addr_, addr);
-    ng_delete_alloc(addr, __FILE__, __LINE__);
-}
-
-JNIEXPORT void JNICALL
 Java_tun_proxy_service_Tun2HttpVpnService_jni_1stop(
         JNIEnv *env, jobject instance, jlong context) {
     struct context *ctx = (struct context *) context;

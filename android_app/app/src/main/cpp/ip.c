@@ -296,11 +296,10 @@ void handle_ip(const struct arguments *args,
     else if (protocol == IPPROTO_UDP)
         handle_udp(args, pkt, length, payload, uid, NULL, epoll_fd);
     else if (protocol == IPPROTO_TCP) {
-        struct allowed redirect;
-        // always use proxy for TCP
-        strcpy(redirect.raddr, http_proxy_addr);
-        redirect.rport = http_proxy_port;
-        handle_tcp(args, pkt, length, payload, uid, allowed, &redirect, epoll_fd);
+        struct allowed allowed;
+        *allowed.raddr = NULL;
+        allowed.rport = 0;
+        handle_tcp(args, pkt, length, payload, uid, 1, NULL, epoll_fd);
     }
 }
 

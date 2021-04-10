@@ -15,12 +15,12 @@ add_library( # Sets the name of the library.
         src/main/cpp/dns.c
         src/main/cpp/icmp.c
         src/main/cpp/ip.c
-        src/main/cpp/http.c
+#        src/main/cpp/http.c
         src/main/cpp/netguard.c
         src/main/cpp/session.c
         src/main/cpp/pcap.c
         src/main/cpp/tcp.c
-        src/main/cpp/tls.c
+#        src/main/cpp/tls.c
         src/main/cpp/udp.c
         src/main/cpp/util.c
         )

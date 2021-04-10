@@ -89,8 +89,6 @@ public class Tun2HttpVpnService extends VpnService {
 
     private native void jni_socks5(String addr, int port, String username, String password);
 
-    private native void jni_http_proxy(String proxyIp, int proxyPort);
-
     // Called from native code
     @TargetApi(Build.VERSION_CODES.Q)
     private int getUidQ(int version, int protocol, String saddr, int sport, String daddr, int dport) {
@@ -217,7 +215,7 @@ public class Tun2HttpVpnService extends VpnService {
         int proxyPort = prefs.getInt(PREF_PROXY_PORT, 0);
         int logLevel = Integer.parseInt(prefs.getString(PREF_LOG_LEVEL, Integer.toString(Log.VERBOSE)));
         if (proxyPort != 0 && !TextUtils.isEmpty(proxyHost)) {
-            jni_http_proxy(proxyHost, proxyPort);
+            jni_socks5(proxyHost, proxyPort, "", "");
             prefs.edit().putBoolean(PREF_RUNNING, true).apply();
             if (tunnelThread == null) {
                 Log.i(TAG, "Starting tunnel thread context=" + jniContext);
