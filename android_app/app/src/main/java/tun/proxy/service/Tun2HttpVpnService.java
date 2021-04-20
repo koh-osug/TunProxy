@@ -213,7 +213,7 @@ public class Tun2HttpVpnService extends VpnService {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String proxyHost = prefs.getString(PREF_PROXY_HOST, "");
         int proxyPort = prefs.getInt(PREF_PROXY_PORT, 0);
-        int logLevel = Integer.parseInt(prefs.getString(PREF_LOG_LEVEL, Integer.toString(Log.VERBOSE)));
+        int logLevel = Integer.parseInt(prefs.getString(PREF_LOG_LEVEL, Integer.toString(Log.WARN)));
         if (proxyPort != 0 && !TextUtils.isEmpty(proxyHost)) {
             jni_socks5(proxyHost, proxyPort, "", "");
             prefs.edit().putBoolean(PREF_RUNNING, true).apply();

@@ -1,7 +1,7 @@
 # Android HTTP traffic Proxy setting tool
 
 This tool is a proxy configuration tool that takes advantage of Android VPNService feature.
-Th communication from specified applications can be proxied.
+The communication from specified applications can be proxied to a SOCKS proxy.
 
 ## How to use
 
@@ -72,19 +72,29 @@ The application list can be sorted from the menu icon  (![Menu](images/Menu.png)
 * sort by package name
   * Sort application list by package name
 
-### MITM (SSL decrypt)
+### MITM (TLS Decryption)
 
-TunProxy does not perform SSL decryption. TunProxy acts like a transparent proxy.
-To perform SSL decryption, set the IP of an SSL decryptable proxy such as Burp suite or Fiddler to the IP of TunProxy
+TunProxy acts like a transparent proxy.
+To perform TLS decryption, configure the IP and port of a TLS decryptable SOCKS proxy in TunProxy.
 
-The following are local proxy tools that can decrypt SSL.
+Some SOCKS based proxies are:
 
+* [Netty in the Middle](https://github.com/koh-osug/nitmproxy)
+
+The following are local proxy tools that can decrypt TLS.
+
+If the proxy you want to use is only supporting HTTP and not SOCKS, you need a SOCKS to HTTP proxy.
+This [StackExchange question](https://superuser.com/questions/443160/is-there-a-socks-proxy-server-program-that-supports-a-http-parent-proxy) lists some possible solutions.
+
+Some HTTP based proxies are:
+
+* [mitmproxy](https://mitmproxy.org)
 * [Burp suite](https://portswigger.net/burp)
 * [Fiddler](https://www.telerik.com/fiddler)
 * [ZAP Proxy](https://www.owasp.org/index.php/OWASP_Zed_Attack_Proxy_Project)
-* [LittleProxy MITM](https://github.com/koh-osug/LittleProxy-mitm)
 
-To decrypt SSL, install the local proxy tool CA certificate in the Android device user certificate.
+
+To decrypt TLS, install the local proxy tool CA certificate in the Android device user certificate.
 However, in Android 7.0 and later, the application no longer trusts user certificates by default.
 
 * https://android-developers.googleblog.com/2016/07/changes-to-trusted-certificate.html

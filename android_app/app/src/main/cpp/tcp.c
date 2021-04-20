@@ -1088,7 +1088,7 @@ int open_tcp_socket(const struct arguments *args,
     struct sockaddr_in6 addr6;
     if (redirect == NULL) {
         if (*socks5_addr && socks5_port) {
-            log_android(ANDROID_LOG_WARN, "TCP%d SOCKS5 to %s/%u",
+            log_android(ANDROID_LOG_INFO, "TCP%d SOCKS5 to %s/%u",
                         version, socks5_addr, socks5_port);
 
             if (version == 4) {
@@ -1112,7 +1112,7 @@ int open_tcp_socket(const struct arguments *args,
             }
         }
     } else {
-        log_android(ANDROID_LOG_DEBUG, "TCP%d redirect to %s/%u",
+        log_android(ANDROID_LOG_INFO, "TCP%d redirect to %s/%u",
                     version, redirect->raddr, redirect->rport);
 
         if (version == 4) {
