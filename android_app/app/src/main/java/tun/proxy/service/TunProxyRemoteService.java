@@ -11,6 +11,7 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import java.util.HashSet;
 import java.util.List;
 
 import tun.proxy.VpnPermissionSupportActivity;
@@ -46,12 +47,16 @@ public class TunProxyRemoteService extends Service {
 
         @Override
         public void startAllowed(String ip, int port, List allowedApps) throws RemoteException {
+            SharedPrefUtil.storeVPNMode(SharedPrefUtil.VPNMode.ALLOW, TunProxyRemoteService.this);
             SharedPrefUtil.saveHostPort(ip, port, TunProxyRemoteService.this);
+            SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.ALLOW, new HashSet<String>(allowedApps), TunProxyRemoteService.this);
             requestVpnPermission();
         }
 
         @Override
         public void startDenied(String ip, int port, List deniedApps) throws RemoteException {
+            SharedPrefUtil.storeVPNMode(SharedPrefUtil.VPNMode.DISALLOW, TunProxyRemoteService.this);
+            SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, new HashSet<String>(deniedApps), TunProxyRemoteService.this);
             SharedPrefUtil.saveHostPort(ip, port, TunProxyRemoteService.this);
             requestVpnPermission();
         }

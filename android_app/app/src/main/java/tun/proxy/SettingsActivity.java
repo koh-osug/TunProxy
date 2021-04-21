@@ -16,7 +16,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.*;
 
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -32,6 +31,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import tun.utils.SharedPrefUtil;
+
 public class SettingsActivity extends AppCompatActivity {
 
     private static final String TAG = "SettingsActivity";
@@ -39,6 +40,10 @@ public class SettingsActivity extends AppCompatActivity {
 
     private ExecutorService executorService;
 
+    public enum AppSortBy {APPNAME, PKGNAME};
+    public enum AppOrderBy {ASC, DESC};
+    public enum AppFiltertBy {APPNAME, PKGNAME};
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -108,21 +113,21 @@ public class SettingsActivity extends AppCompatActivity {
                 if (preference instanceof ListPreference) {
                     final ListPreference listPreference = (ListPreference) preference;
                     int index = listPreference.findIndexOfValue((String) value);
-                    prefDisallow.setEnabled(index == MyApplication.VPNMode.DISALLOW.ordinal());
-                    prefAllow.setEnabled(index == MyApplication.VPNMode.ALLOW.ordinal());
+                    prefDisallow.setEnabled(index == SharedPrefUtil.VPNMode.DISALLOW.ordinal());
+                    prefAllow.setEnabled(index ==  SharedPrefUtil.VPNMode.ALLOW.ordinal());
 
                     // Set the summary to reflect the new value.
                     preference.setSummary(index >= 0 ? listPreference.getEntries()[index] : null);
 
-                    MyApplication.VPNMode mode =  MyApplication.VPNMode.values()[index];
-                    MyApplication.getInstance().storeVPNMode(mode);
+                    SharedPrefUtil.VPNMode mode =  SharedPrefUtil.VPNMode.values()[index];
+                    SharedPrefUtil.storeVPNMode(mode, MyApplication.getInstance().getApplicationContext());
                 }
                 return true;
                 }
             });
             prefPackage.setSummary(prefPackage.getEntry());
-            prefDisallow.setEnabled(MyApplication.VPNMode.DISALLOW.name().equals(prefPackage.getValue()));
-            prefAllow.setEnabled(MyApplication.VPNMode.ALLOW.name().equals(prefPackage.getValue()));
+            prefDisallow.setEnabled(SharedPrefUtil.VPNMode.DISALLOW.name().equals(prefPackage.getValue()));
+            prefAllow.setEnabled(SharedPrefUtil.VPNMode.ALLOW.name().equals(prefPackage.getValue()));
 
             updateMenuItem();
         }
@@ -131,8 +136,8 @@ public class SettingsActivity extends AppCompatActivity {
             final PreferenceScreen prefDisallow = (PreferenceScreen) findPreference(VPN_DISALLOWED_APPLICATION_LIST);
             final PreferenceScreen prefAllow = (PreferenceScreen) findPreference(VPN_ALLOWED_APPLICATION_LIST);
 
-            int countDisallow = MyApplication.getInstance().loadVPNApplication(MyApplication.VPNMode.DISALLOW).size();
-            int countAllow = MyApplication.getInstance().loadVPNApplication(MyApplication.VPNMode.ALLOW).size();
+            int countDisallow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, MyApplication.getInstance().getApplicationContext()).size();
+            int countAllow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.ALLOW, MyApplication.getInstance().getApplicationContext()).size();
             prefDisallow.setTitle(getString(R.string.pref_header_disallowed_application_list) + String.format(" (%d)", countDisallow));
             prefAllow.setTitle(getString(R.string.pref_header_allowed_application_list) + String.format(" (%d)", countAllow));
         }
@@ -157,8 +162,8 @@ public class SettingsActivity extends AppCompatActivity {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 Set<String> set = new HashSet<>();
-                                MyApplication.getInstance().storeVPNApplication(MyApplication.VPNMode.ALLOW, set);
-                                MyApplication.getInstance().storeVPNApplication(MyApplication.VPNMode.DISALLOW, set);
+                                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.ALLOW, set, MyApplication.getInstance().getApplicationContext());
+                                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, set, MyApplication.getInstance().getApplicationContext());
                                 updateMenuItem();
                             }
                         })
@@ -174,14 +179,14 @@ public class SettingsActivity extends AppCompatActivity {
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     public static class DisallowedPackageListFragment extends PackageListFragment {
         public DisallowedPackageListFragment() {
-            super(MyApplication.VPNMode.DISALLOW);
+            super(SharedPrefUtil.VPNMode.DISALLOW);
         }
     }
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     public static class AllowedPackageListFragment extends PackageListFragment  {
         public AllowedPackageListFragment() {
-            super(MyApplication.VPNMode.ALLOW);
+            super(SharedPrefUtil.VPNMode.ALLOW);
         }
     }
 
@@ -195,13 +200,13 @@ public class SettingsActivity extends AppCompatActivity {
 
         private AsyncTaskProgress task;
 
-        private MyApplication.VPNMode mode;
-        private MyApplication.AppSortBy appSortBy = MyApplication.AppSortBy.APPNAME;
-        private MyApplication.AppOrderBy appOrderBy = MyApplication.AppOrderBy.ASC;
-        private MyApplication.AppSortBy appFilterBy = MyApplication.AppSortBy.APPNAME;
+        private SharedPrefUtil.VPNMode mode;
+        private AppSortBy appSortBy = AppSortBy.APPNAME;
+        private AppOrderBy appOrderBy = AppOrderBy.ASC;
+        private AppSortBy appFilterBy = AppSortBy.APPNAME;
         private PreferenceScreen mFilterPreferenceScreen;
 
-        public PackageListFragment(MyApplication.VPNMode mode) {
+        public PackageListFragment(SharedPrefUtil.VPNMode mode) {
             super();
             this.mode = mode;
             this.task = new AsyncTaskProgress(this);
@@ -274,7 +279,7 @@ public class SettingsActivity extends AppCompatActivity {
             this.filter(filter, this.appFilterBy, this.appOrderBy, this.appSortBy);
         }
 
-        protected void filter(String filter, final MyApplication.AppSortBy filterBy, final MyApplication.AppOrderBy orderBy, final MyApplication.AppSortBy sortBy) {
+        protected void filter(String filter, final AppSortBy filterBy, final AppOrderBy orderBy, final AppSortBy sortBy) {
             if (filter == null) {
                 filter = searchFilter;
             } else {
@@ -320,17 +325,17 @@ public class SettingsActivity extends AppCompatActivity {
         @Override
         public void onResume() {
             super.onResume();
-            Set<String> loadMap = MyApplication.getInstance().loadVPNApplication(this.mode);
+            Set<String> loadMap = SharedPrefUtil.loadVPNApplication(this.mode, MyApplication.getInstance().getApplicationContext());
             for (String pkgName : loadMap) {
                 this.mAllPackageInfoMap.put(pkgName, loadMap.contains(pkgName));
             }
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MyApplication.getInstance().getApplicationContext());
-            String appOrderBy = prefs.getString(PREF_VPN_APPLICATION_ORDERBY, MyApplication.AppOrderBy.ASC.name());
-            String appFilterBy = prefs.getString(PREF_VPN_APPLICATION_FILTERBY, MyApplication.AppSortBy.APPNAME.name());
-            String appSortBy = prefs.getString(PREF_VPN_APPLICATION_SORTBY, MyApplication.AppSortBy.APPNAME.name());
-            this.appOrderBy = Enum.valueOf(MyApplication.AppOrderBy.class, appOrderBy);
-            this.appFilterBy = Enum.valueOf(MyApplication.AppSortBy.class, appFilterBy);
-            this.appSortBy = Enum.valueOf(MyApplication.AppSortBy.class, appSortBy);
+            String appOrderBy = prefs.getString(PREF_VPN_APPLICATION_ORDERBY, AppOrderBy.ASC.name());
+            String appFilterBy = prefs.getString(PREF_VPN_APPLICATION_FILTERBY, AppSortBy.APPNAME.name());
+            String appSortBy = prefs.getString(PREF_VPN_APPLICATION_SORTBY, AppSortBy.APPNAME.name());
+            this.appOrderBy = Enum.valueOf(AppOrderBy.class, appOrderBy);
+            this.appFilterBy = Enum.valueOf(AppSortBy.class, appFilterBy);
+            this.appSortBy = Enum.valueOf(AppSortBy.class, appSortBy);
             filter(null);
         }
 
@@ -338,8 +343,8 @@ public class SettingsActivity extends AppCompatActivity {
             this.mFilterPreferenceScreen.removeAll();
         }
 
-//        private void filterPackagesPreferences(String filter, final MyApplication.AppSortBy sortBy, final MyApplication.AppOrderBy orderBy) {
-//            final Context context = MyApplication.getInstance().getApplicationContext();
+//        private void filterPackagesPreferences(String filter, final AppSortBy sortBy, final MyApplication.AppOrderBy orderBy) {
+//            final Context context = SharedPrefUtil.getApplicationContext();
 //            final PackageManager pm = context.getPackageManager();
 //            final List<PackageInfo> installedPackages = pm.getInstalledPackages(PackageManager.GET_META_DATA);
 //            Collections.sort(installedPackages, new Comparator<PackageInfo>() {
@@ -367,7 +372,7 @@ public class SettingsActivity extends AppCompatActivity {
 //            final Map<String, Boolean> installedPackageMap = new HashMap<>();
 //            for (final PackageInfo pi : installedPackages) {
 //                // exclude self package
-//                if (pi.packageName.equals(MyApplication.getInstance().getPackageName())) {
+//                if (pi.packageName.equals(SharedPrefUtil.getPackageName())) {
 //                    continue;
 //                }
 //                boolean checked = this.mAllPackageInfoMap.containsKey(pi.packageName) ? this.mAllPackageInfoMap.get(pi.packageName) : false;
@@ -378,7 +383,7 @@ public class SettingsActivity extends AppCompatActivity {
 //
 //            for (final PackageInfo pi : installedPackages) {
 //                // exclude self package
-//                if (pi.packageName.equals(MyApplication.getInstance().getPackageName())) {
+//                if (pi.packageName.equals(SharedPrefUtil.getPackageName())) {
 //                    continue;
 //                }
 //                String t1 = pi.applicationInfo.loadLabel(pm).toString();
@@ -454,8 +459,8 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         private void storeSelectedPackageSet(final Set<String> set) {
-            MyApplication.getInstance().storeVPNMode(this.mode);
-            MyApplication.getInstance().storeVPNApplication(this.mode, set);
+            SharedPrefUtil.storeVPNMode(this.mode, MyApplication.getInstance().getApplicationContext());
+            SharedPrefUtil.storeVPNApplication(this.mode, set, MyApplication.getInstance().getApplicationContext());
         }
 
         @Override
@@ -467,29 +472,29 @@ public class SettingsActivity extends AppCompatActivity {
                     return true;
                 case R.id.menu_sort_order_asc:
                     item.setChecked(!item.isChecked());
-                    filter(null, appFilterBy, MyApplication.AppOrderBy.ASC, appSortBy);
+                    filter(null, appFilterBy, AppOrderBy.ASC, appSortBy);
                     break;
                 case R.id.menu_sort_order_desc:
                     item.setChecked(!item.isChecked());
-                    filter(null, appFilterBy, MyApplication.AppOrderBy.DESC, appSortBy);
+                    filter(null, appFilterBy, AppOrderBy.DESC, appSortBy);
                     break;
                 case R.id.menu_filter_app_name:
                     item.setChecked(!item.isChecked());
-                    this.appFilterBy = MyApplication.AppSortBy.APPNAME;
-                    //filter(null, MyApplication.AppSortBy.APPNAME, appOrderBy, appSortBy);
+                    this.appFilterBy = AppSortBy.APPNAME;
+                    //filter(null, AppSortBy.APPNAME, appOrderBy, appSortBy);
                     break;
                 case R.id.menu_filter_pkg_name:
                     item.setChecked(!item.isChecked());
-                    this.appFilterBy = MyApplication.AppSortBy.PKGNAME;
-                    //filter(null, MyApplication.AppSortBy.PKGNAME, appOrderBy, appSortBy);
+                    this.appFilterBy = AppSortBy.PKGNAME;
+                    //filter(null, AppSortBy.PKGNAME, appOrderBy, appSortBy);
                     break;
                 case R.id.menu_sort_app_name:
                     item.setChecked(!item.isChecked());
-                    filter(null, appFilterBy, appOrderBy, MyApplication.AppSortBy.APPNAME);
+                    filter(null, appFilterBy, appOrderBy, AppSortBy.APPNAME);
                     break;
                 case R.id.menu_sort_pkg_name:
                     item.setChecked(!item.isChecked());
-                    filter(null, appFilterBy, appOrderBy, MyApplication.AppSortBy.PKGNAME);
+                    filter(null, appFilterBy, appOrderBy, AppSortBy.PKGNAME);
                     break;
             }
             return super.onOptionsItemSelected(item);
@@ -544,7 +549,7 @@ public class SettingsActivity extends AppCompatActivity {
             return filterPackages(packageFragment.searchFilter, packageFragment.appFilterBy, packageFragment.appOrderBy, packageFragment.appSortBy);
         }
 
-        private List<PackageInfo> filterPackages(String filter, final MyApplication.AppSortBy filterBy, final MyApplication.AppOrderBy orderBy, final MyApplication.AppSortBy sortBy) {
+        private List<PackageInfo> filterPackages(String filter, final AppSortBy filterBy, final AppOrderBy orderBy, final AppSortBy sortBy) {
             final Context context = MyApplication.getInstance().getApplicationContext();
             final PackageManager pm = context.getPackageManager();
             final List<PackageInfo> installedPackages = pm.getInstalledPackages(PackageManager.GET_META_DATA);
@@ -563,12 +568,7 @@ public class SettingsActivity extends AppCompatActivity {
                             t2 = o2.packageName;
                             break;
                     }
-//                    try {
-//                        Thread.sleep(100);
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    }
-                    if (MyApplication.AppOrderBy.ASC.equals(orderBy))
+                    if (AppOrderBy.ASC.equals(orderBy))
                         return t1.compareTo(t2);
                     else
                         return t2.compareTo(t1);
@@ -578,7 +578,7 @@ public class SettingsActivity extends AppCompatActivity {
             for (final PackageInfo pi : installedPackages) {
                 if (isCancelled()) continue;
                 // exclude self package
-                if (pi.packageName.equals(MyApplication.getInstance().getPackageName())) {
+                if (pi.packageName.equals(MyApplication.getInstance().getApplicationContext().getPackageName())) {
                     continue;
                 }
                 boolean checked = packageFragment.mAllPackageInfoMap.containsKey(pi.packageName) ? packageFragment.mAllPackageInfoMap.get(pi.packageName) : false;
@@ -596,7 +596,7 @@ public class SettingsActivity extends AppCompatActivity {
             packageFragment.mFilterPreferenceScreen.removeAll();
             for (final PackageInfo pi : installedPackages) {
                 // exclude self package
-                if (pi.packageName.equals(MyApplication.getInstance().getPackageName())) {
+                if (pi.packageName.equals(MyApplication.getInstance().getApplicationContext().getPackageName())) {
                     continue;
                 }
                 String t1 = "";
@@ -614,7 +614,6 @@ public class SettingsActivity extends AppCompatActivity {
                     packageFragment.mFilterPreferenceScreen.addPreference(preference);
                 }
             }
-            return;
         }
 
         @Override
@@ -622,7 +621,6 @@ public class SettingsActivity extends AppCompatActivity {
             super.onCancelled();
             packageFragment.mAllPackageInfoMap.clear();
             packageFragment.mFilterPreferenceScreen.removeAll();
-            return;
         }
 
     }

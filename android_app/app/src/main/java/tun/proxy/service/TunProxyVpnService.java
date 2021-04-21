@@ -31,6 +31,7 @@ import java.util.Set;
 import tun.proxy.MyApplication;
 import tun.proxy.R;
 import tun.utils.DnsUtil;
+import tun.utils.SharedPrefUtil;
 
 public class TunProxyVpnService extends VpnService {
     public static final String PREF_PROXY_HOST = "pref_proxy_host";
@@ -188,20 +189,20 @@ public class TunProxyVpnService extends VpnService {
         // Add list of allowed and disallowed applications
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             MyApplication app = (MyApplication) this.getApplication();
-            if (app.loadVPNMode() == MyApplication.VPNMode.DISALLOW) {
-                Set<String> disallow = app.loadVPNApplication(MyApplication.VPNMode.DISALLOW);
+            if (SharedPrefUtil.loadVPNMode(this) == SharedPrefUtil.VPNMode.DISALLOW) {
+                Set<String> disallow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, this);
                 Log.d(TAG, "disallowed:" + disallow.size());
                 List<String> notFoundPackageList = new ArrayList<>();
                 builder.addDisallowedApplication(Arrays.asList(disallow.toArray(new String[0])), notFoundPackageList);
                 disallow.removeAll(notFoundPackageList);
-                MyApplication.getInstance().storeVPNApplication(MyApplication.VPNMode.DISALLOW, disallow);
+                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, disallow, this);
             } else {
-                Set<String> allow = app.loadVPNApplication(MyApplication.VPNMode.ALLOW);
+                Set<String> allow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.ALLOW, this);
                 Log.d(TAG, "allowed:" + allow.size());
                 List<String> notFoundPackageList = new ArrayList<>();
                 builder.addAllowedApplication(Arrays.asList(allow.toArray(new String[0])), notFoundPackageList);
                 allow.removeAll(notFoundPackageList);
-                MyApplication.getInstance().storeVPNApplication(MyApplication.VPNMode.ALLOW, allow);
+                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.ALLOW, allow, this);
             }
         }
 
