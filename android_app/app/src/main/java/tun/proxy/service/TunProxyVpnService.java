@@ -30,7 +30,7 @@ import java.util.Set;
 
 import tun.proxy.MyApplication;
 import tun.proxy.R;
-import tun.utils.Util;
+import tun.utils.DnsUtil;
 
 public class TunProxyVpnService extends VpnService {
     public static final String PREF_PROXY_HOST = "pref_proxy_host";
@@ -174,7 +174,7 @@ public class TunProxyVpnService extends VpnService {
         builder.addRoute("0.0.0.0", 0);
         builder.addRoute("0:0:0:0:0:0:0:0", 0);
 
-        List<String> dnsList = Util.getDefaultDNS(MyApplication.getInstance().getApplicationContext());
+        List<String> dnsList = DnsUtil.getDefaultDNS(MyApplication.getInstance().getApplicationContext());
         for (String dns : dnsList) {
             Log.i(TAG, "default DNS:" + dns);
             builder.addDnsServer(dns);

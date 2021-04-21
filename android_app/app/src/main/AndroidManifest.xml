@@ -36,6 +36,9 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="tun.proxy.MainActivity" />
         </activity>
+        <activity
+            android:name=".VpnPermissionSupportActivity"
+            android:theme="@style/AppTheme.Transparent" />
 
         <service
             android:name=".service.TunProxyVpnService"

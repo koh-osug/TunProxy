@@ -1,15 +1,21 @@
 package tun.proxy.service;
 
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
 import java.util.List;
 
+import tun.proxy.VpnPermissionSupportActivity;
 import tun.proxy.api.ITunProxyRemoteService;
+import tun.utils.SharedPrefUtil;
 
 /**
  * Service for starting the VPN remotely.
@@ -20,16 +26,34 @@ public class TunProxyRemoteService extends Service {
 
     private static final String TAG = TunProxyRemoteService.class.getName();
 
+    public static final String VPN_ALLOWED_BROADCAST = "TUN_PROXY_VPN_ALLOWED_BROADCAST_ACTION";
+
+    private final BroadcastReceiver vpnAllowedOnActivityResult = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Log.i(TAG, "Starting remotely triggered service.");
+            TunProxyVpnService.start(TunProxyRemoteService.this);
+        }
+    };
+
     private final ITunProxyRemoteService.Stub binder = new ITunProxyRemoteService.Stub() {
+
+        private void requestVpnPermission() {
+            Intent i = new Intent(TunProxyRemoteService.this, VpnPermissionSupportActivity.class);
+            i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            TunProxyRemoteService.this.startActivity(i);
+        }
 
         @Override
         public void startAllowed(String ip, int port, List allowedApps) throws RemoteException {
-            TunProxyVpnService.start(TunProxyRemoteService.this);
+            SharedPrefUtil.saveHostPort(ip, port, TunProxyRemoteService.this);
+            requestVpnPermission();
         }
 
         @Override
         public void startDenied(String ip, int port, List deniedApps) throws RemoteException {
-            TunProxyVpnService.start(TunProxyRemoteService.this);
+            SharedPrefUtil.saveHostPort(ip, port, TunProxyRemoteService.this);
+            requestVpnPermission();
         }
 
         @Override
@@ -37,6 +61,18 @@ public class TunProxyRemoteService extends Service {
             TunProxyVpnService.stop(TunProxyRemoteService.this);
         }
     };
+
+    @Override
+    public void onCreate() {
+        IntentFilter i = new IntentFilter();
+        i.addAction(VPN_ALLOWED_BROADCAST);
+        registerReceiver(vpnAllowedOnActivityResult, i);
+    }
+
+    @Override
+    public void onDestroy() {
+        unregisterReceiver(vpnAllowedOnActivityResult);
+    }
 
     @Nullable
     @Override

@@ -30,9 +30,9 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Util {
+public class DnsUtil {
 
-    private Util() {
+    private DnsUtil() {
     }
 
     private static native String jni_getprop(String name);

@@ -283,7 +283,7 @@ Java_tun_proxy_service_TunProxyVpnService_jni_1done(JNIEnv *env, jobject instanc
 // JNI Util
 
 JNIEXPORT jstring JNICALL
-Java_tun_utils_Util_jni_1getprop(JNIEnv *env, jclass type, jstring name_) {
+Java_tun_utils_DnsUtil_jni_1getprop(JNIEnv *env, jclass type, jstring name_) {
     const char *name = (*env)->GetStringUTFChars(env, name_, 0);
     ng_add_alloc(name, "name");
 

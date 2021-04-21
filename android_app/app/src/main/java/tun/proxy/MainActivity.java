@@ -29,6 +29,7 @@ import android.widget.EditText;
 
 import tun.proxy.service.TunProxyVpnService;
 import tun.utils.IPUtil;
+import tun.utils.SharedPrefUtil;
 
 public class MainActivity extends AppCompatActivity implements
         PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
@@ -248,11 +249,7 @@ public class MainActivity extends AppCompatActivity implements
             }
         }
         String host = parts[0];
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        SharedPreferences.Editor edit = prefs.edit();
-        edit.putString(TunProxyVpnService.PREF_PROXY_HOST, host);
-        edit.putInt(TunProxyVpnService.PREF_PROXY_PORT, port);
-        edit.apply();
+        SharedPrefUtil.saveHostPort(host, port, this);
         return true;
     }
 }
