@@ -31,6 +31,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Util {
+
+    private Util() {
+    }
+
     private static native String jni_getprop(String name);
 
     public static List<String> getDefaultDNS(Context context) {

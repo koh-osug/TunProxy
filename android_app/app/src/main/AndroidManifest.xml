@@ -38,10 +38,19 @@
         </activity>
 
         <service
-            android:name=".service.Tun2HttpVpnService"
+            android:name=".service.TunProxyVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".service.TunProxyRemoteService"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tun.proxy.RemoteService" />
             </intent-filter>
         </service>
 

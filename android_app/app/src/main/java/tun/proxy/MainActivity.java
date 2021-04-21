@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.app.AlertDialog;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
@@ -19,31 +18,29 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.EditText;
 
-import tun.proxy.service.Tun2HttpVpnService;
+import tun.proxy.service.TunProxyVpnService;
 import tun.utils.IPUtil;
 
 public class MainActivity extends AppCompatActivity implements
         PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
-    public static final int REQUEST_VPN = 1;
-    public static final int REQUEST_CERT = 2;
 
-    Button start;
-    Button stop;
-    EditText hostEditText;
-    Handler statusHandler = new Handler();
+    private static final int REQUEST_VPN = 1;
 
-    private Tun2HttpVpnService service;
+    private Button start;
+    private Button stop;
+    private EditText hostEditText;
+    private final Handler statusHandler = new Handler();
+
+    private TunProxyVpnService service;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -139,7 +136,7 @@ public class MainActivity extends AppCompatActivity implements
 
     private ServiceConnection serviceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder binder) {
-            Tun2HttpVpnService.ServiceBinder serviceBinder = (Tun2HttpVpnService.ServiceBinder) binder;
+            TunProxyVpnService.ServiceBinder serviceBinder = (TunProxyVpnService.ServiceBinder) binder;
             service = serviceBinder.getService();
         }
 
@@ -157,15 +154,15 @@ public class MainActivity extends AppCompatActivity implements
 
         statusHandler.post(statusRunnable);
 
-        Intent intent = new Intent(this, Tun2HttpVpnService.class);
+        Intent intent = new Intent(this, TunProxyVpnService.class);
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
-    boolean isRunning() {
+    private boolean isRunning() {
         return service != null && service.isRunning();
     }
 
-    Runnable statusRunnable = new Runnable() {
+    private final Runnable statusRunnable = new Runnable() {
         @Override
         public void run() {
         updateStatus();
@@ -180,7 +177,7 @@ public class MainActivity extends AppCompatActivity implements
         unbindService(serviceConnection);
     }
 
-    void updateStatus() {
+    private void updateStatus() {
         if (service == null) {
             return;
         }
@@ -198,7 +195,7 @@ public class MainActivity extends AppCompatActivity implements
     private void stopVpn() {
         start.setEnabled(true);
         stop.setEnabled(false);
-        Tun2HttpVpnService.stop(this);
+        TunProxyVpnService.stop(this);
     }
 
     private void startVpn() {
@@ -219,14 +216,14 @@ public class MainActivity extends AppCompatActivity implements
         if (requestCode == REQUEST_VPN && parseAndSaveHostPort()) {
             start.setEnabled(false);
             stop.setEnabled(true);
-            Tun2HttpVpnService.start(this);
+            TunProxyVpnService.start(this);
         }
     }
 
     private void loadHostPort() {
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        final String proxyHost = prefs.getString(Tun2HttpVpnService.PREF_PROXY_HOST, "");
-        int proxyPort = prefs.getInt(Tun2HttpVpnService.PREF_PROXY_PORT, 0);
+        final String proxyHost = prefs.getString(TunProxyVpnService.PREF_PROXY_HOST, "");
+        int proxyPort = prefs.getInt(TunProxyVpnService.PREF_PROXY_PORT, 0);
 
         if (TextUtils.isEmpty(proxyHost)) {
             return;
@@ -240,7 +237,7 @@ public class MainActivity extends AppCompatActivity implements
             hostEditText.setError(getString(R.string.enter_host));
             return false;
         }
-        String parts[] = hostPort.split(":");
+        String[] parts = hostPort.split(":");
         int port = 0;
         if (parts.length > 1) {
             try {
@@ -250,13 +247,12 @@ public class MainActivity extends AppCompatActivity implements
                 return false;
             }
         }
-        String[] ipParts = parts[0].split("\\.");
         String host = parts[0];
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         SharedPreferences.Editor edit = prefs.edit();
-        edit.putString(Tun2HttpVpnService.PREF_PROXY_HOST, host);
-        edit.putInt(Tun2HttpVpnService.PREF_PROXY_PORT, port);
-        edit.commit();
+        edit.putString(TunProxyVpnService.PREF_PROXY_HOST, host);
+        edit.putInt(TunProxyVpnService.PREF_PROXY_PORT, port);
+        edit.apply();
         return true;
     }
 }

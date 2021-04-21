@@ -1,4 +1,4 @@
-# Android HTTP traffic Proxy setting tool
+# Android Network Traffic Proxy Tool
 
 This tool is a proxy configuration tool that takes advantage of Android VPNService feature.
 The communication from specified applications can be proxied to a SOCKS proxy.
@@ -118,6 +118,8 @@ Display application version
 ~~~shell
 ./gradlew build
  ~~~~
+
+The used icon was purchased from iconfinder.
 
 ## Base application
 

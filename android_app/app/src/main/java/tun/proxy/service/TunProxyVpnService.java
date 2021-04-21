@@ -32,7 +32,7 @@ import tun.proxy.MyApplication;
 import tun.proxy.R;
 import tun.utils.Util;
 
-public class Tun2HttpVpnService extends VpnService {
+public class TunProxyVpnService extends VpnService {
     public static final String PREF_PROXY_HOST = "pref_proxy_host";
     public static final String PREF_PROXY_PORT = "pref_proxy_port";
     public static final String PREF_LOG_LEVEL = "pref_log_level";
@@ -49,7 +49,7 @@ public class Tun2HttpVpnService extends VpnService {
         System.loadLibrary("tun2http");
     }
 
-    private Tun2HttpVpnService.Builder lastBuilder = null;
+    private TunProxyVpnService.Builder lastBuilder = null;
     private ParcelFileDescriptor vpn = null;
 
     synchronized private static PowerManager.WakeLock getLock(Context context) {
@@ -62,13 +62,13 @@ public class Tun2HttpVpnService extends VpnService {
     }
 
     public static void start(Context context) {
-        Intent intent = new Intent(context, Tun2HttpVpnService.class);
+        Intent intent = new Intent(context, TunProxyVpnService.class);
         intent.setAction(ACTION_START);
         context.startService(intent);
     }
 
     public static void stop(Context context) {
-        Intent intent = new Intent(context, Tun2HttpVpnService.class);
+        Intent intent = new Intent(context, TunProxyVpnService.class);
         intent.setAction(ACTION_STOP);
         context.startService(intent);
     }
@@ -185,7 +185,7 @@ public class Tun2HttpVpnService extends VpnService {
         Log.i(TAG, "MTU=" + mtu);
         builder.setMtu(mtu);
 
-        // AAdd list of allowed and disallowed applications
+        // Add list of allowed and disallowed applications
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             MyApplication app = (MyApplication) this.getApplication();
             if (app.loadVPNMode() == MyApplication.VPNMode.DISALLOW) {
@@ -341,8 +341,8 @@ public class Tun2HttpVpnService extends VpnService {
             return super.onTransact(code, data, reply, flags);
         }
 
-        public Tun2HttpVpnService getService() {
-            return Tun2HttpVpnService.this;
+        public TunProxyVpnService getService() {
+            return TunProxyVpnService.this;
         }
     }
 

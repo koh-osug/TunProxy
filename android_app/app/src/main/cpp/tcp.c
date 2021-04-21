@@ -18,7 +18,6 @@
 */
 
 #include "netguard.h"
-#include "tls.h"
 
 extern char socks5_addr[INET6_ADDRSTRLEN + 1];
 extern int socks5_port;

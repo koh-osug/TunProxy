@@ -9,7 +9,7 @@ import androidx.preference.PreferenceManager;
 import android.util.Log;
 import tun.proxy.R;
 
-import tun.proxy.service.Tun2HttpVpnService;
+import tun.proxy.service.TunProxyVpnService;
 
 public class BootReceiver extends BroadcastReceiver {
 
@@ -20,12 +20,12 @@ public class BootReceiver extends BroadcastReceiver {
         }
 
         final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        boolean isRunning = prefs.getBoolean(Tun2HttpVpnService.PREF_RUNNING, false);
+        boolean isRunning = prefs.getBoolean(TunProxyVpnService.PREF_RUNNING, false);
         if (isRunning) {
             Intent prepare = VpnService.prepare(context);
             if (prepare == null) {
                 Log.d(context.getString(R.string.app_name) + ".Boot", "Starting vpn");
-                Tun2HttpVpnService.start(context);
+                TunProxyVpnService.start(context);
             } else {
                 Log.d(context.getString(R.string.app_name) + ".Boot", "Not prepared");
             }
