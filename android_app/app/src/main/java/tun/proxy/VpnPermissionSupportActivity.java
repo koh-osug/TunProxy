@@ -38,7 +38,11 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
                         finish();
                     }
                 });
-        activityResultLauncher.launch(VpnService.prepare(this));
+        Intent i = VpnService.prepare(this);
+        // already prepared iff null
+        if (i != null) {
+            activityResultLauncher.launch(i);
+        }
     }
 
 
