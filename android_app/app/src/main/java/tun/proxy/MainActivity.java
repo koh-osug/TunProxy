@@ -135,7 +135,7 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
-    private ServiceConnection serviceConnection = new ServiceConnection() {
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder binder) {
             TunProxyVpnService.ServiceBinder serviceBinder = (TunProxyVpnService.ServiceBinder) binder;
             service = serviceBinder.getService();
@@ -229,7 +229,7 @@ public class MainActivity extends AppCompatActivity implements
         if (TextUtils.isEmpty(proxyHost)) {
             return;
         }
-        hostEditText.setText(proxyHost + ":" + proxyPort);
+        hostEditText.setText(getString(R.string.proxy, proxyHost, proxyPort));
     }
 
     private boolean parseAndSaveHostPort() {

@@ -38,7 +38,9 @@ public class TunProxyVpnService extends VpnService {
     public static final String PREF_PROXY_PORT = "pref_proxy_port";
     public static final String PREF_LOG_LEVEL = "pref_log_level";
     public static final String PREF_RUNNING = "pref_running";
-    private static final String TAG = "Tun2Http.Service";
+
+    private static final String TAG = TunProxyVpnService.class.getName();
+
     private static final String ACTION_START = "start";
     private static final String ACTION_STOP = "stop";
     private static volatile PowerManager.WakeLock wlInstance = null;
@@ -50,7 +52,6 @@ public class TunProxyVpnService extends VpnService {
         System.loadLibrary("tun2http");
     }
 
-    private TunProxyVpnService.Builder lastBuilder = null;
     private ParcelFileDescriptor vpn = null;
 
     synchronized private static PowerManager.WakeLock getLock(Context context) {
@@ -120,7 +121,7 @@ public class TunProxyVpnService extends VpnService {
 
     private void start() {
         if (vpn == null) {
-            lastBuilder = getBuilder();
+            Builder lastBuilder = getBuilder();
             vpn = startVPN(lastBuilder);
             if (vpn == null)
                 throw new IllegalStateException(getString((R.string.msg_start_failed)));
@@ -280,13 +281,6 @@ public class TunProxyVpnService extends VpnService {
         }
     }
 
-    private boolean isSupported(int protocol) {
-        return (protocol == 1 /* ICMPv4 */ ||
-                protocol == 59 /* ICMPv6 */ ||
-                protocol == 6 /* TCP */ ||
-                protocol == 17 /* UDP */);
-    }
-
     @Override
     public void onCreate() {
         // Native init
@@ -348,10 +342,6 @@ public class TunProxyVpnService extends VpnService {
     }
 
     private class Builder extends VpnService.Builder {
-        private int mtu;
-        private List<String> listAddress = new ArrayList<>();
-        private List<String> listRoute = new ArrayList<>();
-        private List<String> listDns = new ArrayList<>();
 
         private Builder() {
             super();
@@ -359,106 +349,55 @@ public class TunProxyVpnService extends VpnService {
 
         @Override
         public VpnService.Builder setMtu(int mtu) {
-            this.mtu = mtu;
             super.setMtu(mtu);
             return this;
         }
 
         @Override
         public Builder addAddress(String address, int prefixLength) {
-            listAddress.add(address + "/" + prefixLength);
             super.addAddress(address, prefixLength);
             return this;
         }
 
         @Override
         public Builder addRoute(String address, int prefixLength) {
-            listRoute.add(address + "/" + prefixLength);
             super.addRoute(address, prefixLength);
             return this;
         }
 
         @Override
        public Builder addDnsServer(InetAddress address) {
-            listDns.add(address.getHostAddress());
             super.addDnsServer(address);
             return this;
        }
 
         @Override
         public Builder addDnsServer(String address) {
-//            listDns.add(address);
             super.addDnsServer(address);
             return this;
         }
 
         // min sdk 26
-        public Builder addAllowedApplication(final List<String> packageList, final List<String> notFoundPackegeList)  {
+        public void addAllowedApplication(final List<String> packageList, final List<String> notFoundPackageList)  {
             for (String pkg : packageList) {
                 try {
                     Log.i(TAG, "allowed:" + pkg);
                     addAllowedApplication(pkg);
                 } catch (PackageManager.NameNotFoundException e) {
-                    notFoundPackegeList.add(pkg);
+                    notFoundPackageList.add(pkg);
                 }
             }
-            return this;
         }
 
-        public Builder addDisallowedApplication(final List<String> packageList) throws PackageManager.NameNotFoundException {
-            //
-            for (String pkg : packageList) {
-                Log.i(TAG, "disallowed:" + pkg);
-                addDisallowedApplication(pkg);
-            }
-            return this;
-        }
-
-        public Builder addDisallowedApplication(final List<String> packageList, final List<String> notFoundPackegeList)  {
-            //
+        public void addDisallowedApplication(final List<String> packageList, final List<String> notFoundPackageList)  {
             for (String pkg : packageList) {
                 try {
                     Log.i(TAG, "disallowed:" + pkg);
                     addDisallowedApplication(pkg);
                 } catch (PackageManager.NameNotFoundException e) {
-                    notFoundPackegeList.add(pkg);
+                    notFoundPackageList.add(pkg);
                 }
             }
-            return this;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            Builder other = (Builder) obj;
-
-            if (other == null)
-                return false;
-
-            if (this.mtu != other.mtu)
-                return false;
-
-            if (this.listAddress.size() != other.listAddress.size())
-                return false;
-
-            if (this.listRoute.size() != other.listRoute.size())
-                return false;
-
-            if (this.listDns.size() != other.listDns.size())
-                return false;
-
-            for (String address : this.listAddress)
-                if (!other.listAddress.contains(address))
-                    return false;
-
-            for (String route : this.listRoute)
-                if (!other.listRoute.contains(route))
-                    return false;
-
-            for (String dns : this.listDns)
-                if (!other.listDns.contains(dns))
-                    return false;
-
-            return true;
         }
 
 //        public boolean isNetworkConnected() {

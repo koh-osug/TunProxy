@@ -1,2 +1,3 @@
+include ':api'
 rootProject.name='TunProxy'
 include ':app'
