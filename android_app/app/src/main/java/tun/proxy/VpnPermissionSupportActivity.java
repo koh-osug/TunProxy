@@ -43,6 +43,13 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
         if (i != null) {
             activityResultLauncher.launch(i);
         }
+        else {
+            // notify caller that we are already prepared
+            i = new Intent();
+            i.setAction(TunProxyRemoteService.VPN_ALLOWED_BROADCAST);
+            sendBroadcast(i);
+            finish();
+        }
     }
 
 
