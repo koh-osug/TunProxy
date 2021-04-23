@@ -38,16 +38,12 @@ public class SettingsActivity extends AppCompatActivity {
     private static final String TAG = "SettingsActivity";
     private static final String TITLE_TAG = "Settings";
 
-    private ExecutorService executorService;
-
     public enum AppSortBy {APPNAME, PKGNAME};
     public enum AppOrderBy {ASC, DESC};
-    public enum AppFiltertBy {APPNAME, PKGNAME};
-    
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        executorService = Executors.newSingleThreadExecutor();
         setContentView(R.layout.activity_settings);
         if (savedInstanceState == null) {
             getSupportFragmentManager()
@@ -84,10 +80,6 @@ public class SettingsActivity extends AppCompatActivity {
         }
         return super.onSupportNavigateUp();
     }
-
-    /**
-     * Inner Classes.
-     */
 
     public static class SettingsFragment extends PreferenceFragmentCompat implements Preference.OnPreferenceClickListener {
         public static final String VPN_CONNECTION_MODE = "vpn_connection_mode";
@@ -138,8 +130,8 @@ public class SettingsActivity extends AppCompatActivity {
 
             int countDisallow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, MyApplication.getInstance().getApplicationContext()).size();
             int countAllow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.ALLOW, MyApplication.getInstance().getApplicationContext()).size();
-            prefDisallow.setTitle(getString(R.string.pref_header_disallowed_application_list) + String.format(" (%d)", countDisallow));
-            prefAllow.setTitle(getString(R.string.pref_header_allowed_application_list) + String.format(" (%d)", countAllow));
+            prefDisallow.setTitle(getString(R.string.pref_header_disallowed_application_list, countDisallow));
+            prefAllow.setTitle(getString(R.string.pref_header_allowed_application_list, countAllow));
         }
 
         /*
@@ -158,7 +150,7 @@ public class SettingsActivity extends AppCompatActivity {
                     new AlertDialog.Builder(getActivity())
                         .setTitle(getString(R.string.title_activity_settings))
                         .setMessage(getString(R.string.pref_dialog_clear_all_application_msg))
-                        .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 Set<String> set = new HashSet<>();
@@ -167,7 +159,7 @@ public class SettingsActivity extends AppCompatActivity {
                                 updateMenuItem();
                             }
                         })
-                        .setNegativeButton("Cancel", null)
+                        .setNegativeButton(android.R.string.cancel, null)
                         .show();
                     break;
             }

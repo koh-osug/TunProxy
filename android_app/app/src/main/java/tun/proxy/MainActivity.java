@@ -112,7 +112,7 @@ public class MainActivity extends AppCompatActivity implements
                 break;
             case R.id.action_show_about:
                 new AlertDialog.Builder(this)
-                    .setTitle(getString(R.string.app_name) + getVersionName())
+                    .setTitle(getString(R.string.app_about, getVersionName()))
                     .setMessage(R.string.app_name)
                     .show();
                 break;
