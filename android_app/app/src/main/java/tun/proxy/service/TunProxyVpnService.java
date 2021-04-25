@@ -1,3 +1,20 @@
+/*
+ *     TunProxy is a proxy forwarding tool using Android's VPNService.
+ *     Copyright (C) 2021 raise.isayan@gmail.com / Karsten Ohme
+ *
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package tun.proxy.service;
 
 import android.annotation.TargetApi;
@@ -28,11 +45,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
-import tun.proxy.MyApplication;
 import tun.proxy.R;
 import tun.utils.DnsUtil;
 import tun.utils.SharedPrefUtil;
 
+/**
+ * VPNService.
+ * @author <a href="mailto:raise.isayan@gmail.com">raise.isayan@gmail.com</a>
+ */
 public class TunProxyVpnService extends VpnService {
     public static final String PREF_PROXY_HOST = "pref_proxy_host";
     public static final String PREF_PROXY_PORT = "pref_proxy_port";
@@ -176,7 +196,7 @@ public class TunProxyVpnService extends VpnService {
         builder.addRoute("0.0.0.0", 0);
         builder.addRoute("0:0:0:0:0:0:0:0", 0);
 
-        List<String> dnsList = DnsUtil.getDefaultDNS(MyApplication.getInstance().getApplicationContext());
+        List<String> dnsList = DnsUtil.getDefaultDNS(this);
         for (String dns : dnsList) {
             Log.i(TAG, "default DNS:" + dns);
             builder.addDnsServer(dns);
@@ -189,7 +209,6 @@ public class TunProxyVpnService extends VpnService {
 
         // Add list of allowed and disallowed applications
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            MyApplication app = (MyApplication) this.getApplication();
             if (SharedPrefUtil.loadVPNMode(this) == SharedPrefUtil.VPNMode.DISALLOW) {
                 Set<String> disallow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, this);
                 Log.d(TAG, "disallowed:" + disallow.size());

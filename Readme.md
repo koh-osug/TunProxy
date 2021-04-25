@@ -1,7 +1,9 @@
 # Android Network Traffic Proxy Tool
 
-This tool is a proxy configuration tool that takes advantage of Android VPNService feature.
+This tool is a proxy forwarding tool that takes advantage of Android VPNService feature.
 The communication from specified applications can be proxied to a SOCKS proxy.
+
+Most of the C based code was copied from [NetGuard](https://github.com/M66B/NetGuard) and is the work is also released under the GPL 3.0.
 
 ## How to use
 
@@ -120,9 +122,3 @@ Display application version
  ~~~~
 
 The used icon was purchased from iconfinder.
-
-## Base application
-
-Most of the code was created based on the following applications for creating applications.
-
-  * [NetGuard](https://github.com/M66B/NetGuard)

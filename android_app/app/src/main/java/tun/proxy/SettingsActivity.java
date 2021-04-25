@@ -1,3 +1,20 @@
+/*
+ *     TunProxy is a proxy forwarding tool using Android's VPNService.
+ *     Copyright (C) 2021 raise.isayan@gmail.com / Karsten Ohme
+ *
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package tun.proxy;
 
 import android.annotation.TargetApi;
@@ -28,14 +45,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import tun.utils.SharedPrefUtil;
 
+/**
+ * Settings activity of the app.
+ * @author <a href="mailto:raise.isayan@gmail.com">raise.isayan@gmail.com</a>
+ */
 public class SettingsActivity extends AppCompatActivity {
 
-    private static final String TAG = "SettingsActivity";
     private static final String TITLE_TAG = "Settings";
 
     public enum AppSortBy {APPNAME, PKGNAME};
@@ -112,7 +130,7 @@ public class SettingsActivity extends AppCompatActivity {
                     preference.setSummary(index >= 0 ? listPreference.getEntries()[index] : null);
 
                     SharedPrefUtil.VPNMode mode =  SharedPrefUtil.VPNMode.values()[index];
-                    SharedPrefUtil.storeVPNMode(mode, MyApplication.getInstance().getApplicationContext());
+                    SharedPrefUtil.storeVPNMode(mode, getContext());
                 }
                 return true;
                 }
@@ -128,8 +146,8 @@ public class SettingsActivity extends AppCompatActivity {
             final PreferenceScreen prefDisallow = (PreferenceScreen) findPreference(VPN_DISALLOWED_APPLICATION_LIST);
             final PreferenceScreen prefAllow = (PreferenceScreen) findPreference(VPN_ALLOWED_APPLICATION_LIST);
 
-            int countDisallow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, MyApplication.getInstance().getApplicationContext()).size();
-            int countAllow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.ALLOW, MyApplication.getInstance().getApplicationContext()).size();
+            int countDisallow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, getContext()).size();
+            int countAllow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.ALLOW, getContext()).size();
             prefDisallow.setTitle(getString(R.string.pref_header_disallowed_application_list, countDisallow));
             prefAllow.setTitle(getString(R.string.pref_header_allowed_application_list, countAllow));
         }
@@ -154,8 +172,10 @@ public class SettingsActivity extends AppCompatActivity {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 Set<String> set = new HashSet<>();
-                                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.ALLOW, set, MyApplication.getInstance().getApplicationContext());
-                                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, set, MyApplication.getInstance().getApplicationContext());
+                                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.ALLOW, set,
+                                        getContext());
+                                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.DISALLOW,
+                                        set, getContext());
                                 updateMenuItem();
                             }
                         })
@@ -306,7 +326,7 @@ public class SettingsActivity extends AppCompatActivity {
 
             Set<String> selected = this.getAllSelectedPackageSet();
             storeSelectedPackageSet(selected);
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MyApplication.getInstance().getApplicationContext());
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
             SharedPreferences.Editor edit = prefs.edit();
             edit.putString(PREF_VPN_APPLICATION_ORDERBY, this.appOrderBy.name());
             edit.putString(PREF_VPN_APPLICATION_FILTERBY, this.appFilterBy.name());
@@ -317,11 +337,11 @@ public class SettingsActivity extends AppCompatActivity {
         @Override
         public void onResume() {
             super.onResume();
-            Set<String> loadMap = SharedPrefUtil.loadVPNApplication(this.mode, MyApplication.getInstance().getApplicationContext());
+            Set<String> loadMap = SharedPrefUtil.loadVPNApplication(this.mode, getContext());
             for (String pkgName : loadMap) {
                 this.mAllPackageInfoMap.put(pkgName, loadMap.contains(pkgName));
             }
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MyApplication.getInstance().getApplicationContext());
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
             String appOrderBy = prefs.getString(PREF_VPN_APPLICATION_ORDERBY, AppOrderBy.ASC.name());
             String appFilterBy = prefs.getString(PREF_VPN_APPLICATION_FILTERBY, AppSortBy.APPNAME.name());
             String appSortBy = prefs.getString(PREF_VPN_APPLICATION_SORTBY, AppSortBy.APPNAME.name());
@@ -451,8 +471,8 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         private void storeSelectedPackageSet(final Set<String> set) {
-            SharedPrefUtil.storeVPNMode(this.mode, MyApplication.getInstance().getApplicationContext());
-            SharedPrefUtil.storeVPNApplication(this.mode, set, MyApplication.getInstance().getApplicationContext());
+            SharedPrefUtil.storeVPNMode(this.mode, getContext());
+            SharedPrefUtil.storeVPNApplication(this.mode, set, getContext());
         }
 
         @Override
@@ -533,7 +553,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         @Override
         protected void onPreExecute() {
-            packageFragment.mFilterPreferenceScreen.addPreference(new ProgressPreference(packageFragment.getActivity()));
+            packageFragment.mFilterPreferenceScreen.addPreference(new ProgressPreference(packageFragment.getContext()));
         }
 
         @Override
@@ -542,8 +562,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         private List<PackageInfo> filterPackages(String filter, final AppSortBy filterBy, final AppOrderBy orderBy, final AppSortBy sortBy) {
-            final Context context = MyApplication.getInstance().getApplicationContext();
-            final PackageManager pm = context.getPackageManager();
+            final PackageManager pm = packageFragment.getContext().getPackageManager();
             final List<PackageInfo> installedPackages = pm.getInstalledPackages(PackageManager.GET_META_DATA);
             Collections.sort(installedPackages, new Comparator<PackageInfo>() {
                 @Override
@@ -570,7 +589,7 @@ public class SettingsActivity extends AppCompatActivity {
             for (final PackageInfo pi : installedPackages) {
                 if (isCancelled()) continue;
                 // exclude self package
-                if (pi.packageName.equals(MyApplication.getInstance().getApplicationContext().getPackageName())) {
+                if (pi.packageName.equals(packageFragment.getContext().getPackageName())) {
                     continue;
                 }
                 boolean checked = packageFragment.mAllPackageInfoMap.containsKey(pi.packageName) ? packageFragment.mAllPackageInfoMap.get(pi.packageName) : false;
@@ -583,12 +602,11 @@ public class SettingsActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(List<PackageInfo> installedPackages) {
-            final Context context = MyApplication.getInstance().getApplicationContext();
-            final PackageManager pm = context.getPackageManager();
+            final PackageManager pm = packageFragment.getContext().getPackageManager();
             packageFragment.mFilterPreferenceScreen.removeAll();
             for (final PackageInfo pi : installedPackages) {
                 // exclude self package
-                if (pi.packageName.equals(MyApplication.getInstance().getApplicationContext().getPackageName())) {
+                if (pi.packageName.equals(packageFragment.getContext().getPackageName())) {
                     continue;
                 }
                 String t1 = "";

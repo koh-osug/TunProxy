@@ -8,7 +8,6 @@ import androidx.preference.PreferenceManager;
 import java.util.HashSet;
 import java.util.Set;
 
-import tun.proxy.MyApplication;
 import tun.proxy.service.TunProxyVpnService;
 
 /**

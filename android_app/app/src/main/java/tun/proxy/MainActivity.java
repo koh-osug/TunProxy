@@ -1,3 +1,20 @@
+/*
+ *     TunProxy is a proxy forwarding tool using Android's VPNService.
+ *     Copyright (C) 2021 raise.isayan@gmail.com / Karsten Ohme
+ *
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package tun.proxy;
 
 import android.net.VpnService;
@@ -31,6 +48,10 @@ import tun.proxy.service.TunProxyVpnService;
 import tun.utils.IPUtil;
 import tun.utils.SharedPrefUtil;
 
+/**
+ * Main activity of the app.
+ * @author <a href="mailto:raise.isayan@gmail.com">raise.isayan@gmail.com</a>
+ */
 public class MainActivity extends AppCompatActivity implements
         PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
 
@@ -113,7 +134,7 @@ public class MainActivity extends AppCompatActivity implements
             case R.id.action_show_about:
                 new AlertDialog.Builder(this)
                     .setTitle(getString(R.string.app_about, getVersionName()))
-                    .setMessage(R.string.app_name)
+                    .setMessage(R.string.app_disclaimer)
                     .show();
                 break;
             default:
