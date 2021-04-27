@@ -111,10 +111,10 @@ public class SettingsActivity extends AppCompatActivity {
             setHasOptionsMenu(true);
 
             /* Allowed / Disallowed Application */
-            final ListPreference prefPackage = (ListPreference) this.findPreference(VPN_CONNECTION_MODE);
-            final PreferenceScreen prefDisallow = (PreferenceScreen) findPreference(VPN_DISALLOWED_APPLICATION_LIST);
-            final PreferenceScreen prefAllow = (PreferenceScreen) findPreference(VPN_ALLOWED_APPLICATION_LIST);
-            final PreferenceScreen clearAllSelection = (PreferenceScreen) findPreference(VPN_CLEAR_ALL_SELECTION);
+            final ListPreference prefPackage = findPreference(VPN_CONNECTION_MODE);
+            final PreferenceScreen prefDisallow = findPreference(VPN_DISALLOWED_APPLICATION_LIST);
+            final PreferenceScreen prefAllow = findPreference(VPN_ALLOWED_APPLICATION_LIST);
+            final PreferenceScreen clearAllSelection = findPreference(VPN_CLEAR_ALL_SELECTION);
             clearAllSelection.setOnPreferenceClickListener(this);
 
             prefPackage.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
@@ -135,21 +135,20 @@ public class SettingsActivity extends AppCompatActivity {
                 return true;
                 }
             });
-            prefPackage.setSummary(prefPackage.getEntry());
+            prefPackage.setSummary(getResources().getStringArray(R.array.pref_vpn_connection_name)[SharedPrefUtil.loadVPNMode(this.getContext()).ordinal()]);
             prefDisallow.setEnabled(SharedPrefUtil.VPNMode.DISALLOW.name().equals(prefPackage.getValue()));
             prefAllow.setEnabled(SharedPrefUtil.VPNMode.ALLOW.name().equals(prefPackage.getValue()));
-
             updateMenuItem();
         }
 
         private void updateMenuItem() {
-            final PreferenceScreen prefDisallow = (PreferenceScreen) findPreference(VPN_DISALLOWED_APPLICATION_LIST);
-            final PreferenceScreen prefAllow = (PreferenceScreen) findPreference(VPN_ALLOWED_APPLICATION_LIST);
+            final PreferenceScreen prefDisallow = findPreference(VPN_DISALLOWED_APPLICATION_LIST);
+            final PreferenceScreen prefAllow = findPreference(VPN_ALLOWED_APPLICATION_LIST);
 
             int countDisallow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, getContext()).size();
             int countAllow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.ALLOW, getContext()).size();
             prefDisallow.setTitle(getString(R.string.pref_header_disallowed_application_list, countDisallow));
-            prefAllow.setTitle(getString(R.string.pref_header_allowed_application_list, countAllow));
+            prefAllow.setTitle(getString(R.string.pref_header_disallowed_application_list, countAllow));
         }
 
         /*

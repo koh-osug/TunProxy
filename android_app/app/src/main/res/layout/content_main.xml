@@ -22,6 +22,7 @@
             android:gravity="center"
             android:hint="@string/host_hint"
             android:inputType="text"
+            android:importantForAutofill="no"
             android:maxLines="1"
             android:minWidth="60dp"
             android:singleLine="true" />

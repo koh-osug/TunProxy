@@ -206,6 +206,7 @@ public class MainActivity extends AppCompatActivity implements
         if (isRunning()) {
             start.setEnabled(false);
             hostEditText.setEnabled(false);
+            loadHostPort();
             stop.setEnabled(true);
         } else {
             start.setEnabled(true);

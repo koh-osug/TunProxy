@@ -124,9 +124,9 @@ public class TunProxyVpnService extends VpnService {
         InetSocketAddress local = new InetSocketAddress(saddr, sport);
         InetSocketAddress remote = new InetSocketAddress(daddr, dport);
 
-        Log.i(TAG, "Get uid local=" + local + " remote=" + remote);
+        Log.d(TAG, "Get uid local=" + local + " remote=" + remote);
         int uid = cm.getConnectionOwnerUid(protocol, local, remote);
-        Log.i(TAG, "Get uid=" + uid);
+        Log.d(TAG, "Get uid=" + uid);
         return uid;
     }
 
@@ -204,7 +204,7 @@ public class TunProxyVpnService extends VpnService {
 
         // MTU
         int mtu = jni_get_mtu();
-        Log.i(TAG, "MTU=" + mtu);
+        Log.d(TAG, "MTU=" + mtu);
         builder.setMtu(mtu);
 
         // Add list of allowed and disallowed applications
