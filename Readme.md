@@ -78,10 +78,7 @@ The application list can be sorted from the menu icon  (![Menu](images/Menu.png)
 
 TunProxy acts like a transparent proxy.
 To perform TLS decryption, configure the IP and port of a TLS decryptable SOCKS proxy in TunProxy.
-
-Some SOCKS based proxies are:
-
-* [Netty in the Middle](https://github.com/koh-osug/nitmproxy)
+SOCKS offer a wider support for protocol and it not limited to HTTPs.
 
 The following are local proxy tools that can decrypt TLS.
 
@@ -95,6 +92,10 @@ Some HTTP based proxies are:
 * [Fiddler](https://www.telerik.com/fiddler)
 * [ZAP Proxy](https://www.owasp.org/index.php/OWASP_Zed_Attack_Proxy_Project)
 
+
+Some SOCKS based proxies are:
+
+* [Netty in the Middle](https://github.com/chhsiao90/nitmproxy) __NOTE:__ This is a library only and must be included in a developed app to log the data traffic.
 
 To decrypt TLS, install the local proxy tool CA certificate in the Android device user certificate.
 However, in Android 7.0 and later, the application no longer trusts user certificates by default.
