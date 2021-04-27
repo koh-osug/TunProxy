@@ -31,6 +31,7 @@ import android.content.pm.PackageManager;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Observer;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
@@ -44,6 +45,11 @@ import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.EditText;
 
+import javax.inject.Inject;
+
+import tun.proxy.di.DaggerWrapper;
+import tun.proxy.event.HideAppEvent;
+import tun.proxy.event.SingleLiveEvent;
 import tun.proxy.service.TunProxyVpnService;
 import tun.utils.IPUtil;
 import tun.utils.SharedPrefUtil;
@@ -64,9 +70,13 @@ public class MainActivity extends AppCompatActivity implements
 
     private TunProxyVpnService service;
 
+    @Inject
+    SingleLiveEvent<HideAppEvent> hideAppEventSingleLiveEvent;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DaggerWrapper.getComponent(this).inject(this);
         setContentView(R.layout.activity_main);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -90,8 +100,17 @@ public class MainActivity extends AppCompatActivity implements
         start.setEnabled(true);
         stop.setEnabled(false);
 
-        loadHostPort();
-
+        hideAppEventSingleLiveEvent.observe(this, new Observer<HideAppEvent>() {
+            @Override
+            public void onChanged(HideAppEvent hideAppEvent) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        MainActivity.this.moveTaskToBack(true);
+                    }
+                });
+            }
+});
     }
     @Override
     public boolean onPreferenceStartFragment(PreferenceFragmentCompat caller, Preference pref) {

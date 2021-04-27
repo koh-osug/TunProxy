@@ -20,6 +20,8 @@ package tun.proxy;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.VpnService;
+import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.util.Log;
 
 import androidx.activity.ComponentActivity;
@@ -27,7 +29,13 @@ import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.Nullable;
 
+import javax.inject.Inject;
+
+import tun.proxy.di.DaggerWrapper;
+import tun.proxy.event.HideAppEvent;
+import tun.proxy.event.SingleLiveEvent;
 import tun.proxy.service.TunProxyRemoteService;
 
 /**
@@ -38,6 +46,15 @@ import tun.proxy.service.TunProxyRemoteService;
 public class VpnPermissionSupportActivity extends ComponentActivity {
 
     private static final String TAG = VpnPermissionSupportActivity.class.getName();
+
+    @Inject
+    SingleLiveEvent<HideAppEvent> hideAppEventSingleLiveEvent;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        DaggerWrapper.getComponent(this).inject(this);
+    }
 
     @Override
     protected void onStart() {
@@ -53,6 +70,7 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
                             sendBroadcast(i);
                         }
                         finish();
+                        hideAppEventSingleLiveEvent.postValue(new HideAppEvent());
                     }
                 });
         Intent i = VpnService.prepare(this);
@@ -66,6 +84,7 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
             i.setAction(TunProxyRemoteService.VPN_ALLOWED_BROADCAST);
             sendBroadcast(i);
             finish();
+            hideAppEventSingleLiveEvent.postValue(new HideAppEvent());
         }
     }
 
