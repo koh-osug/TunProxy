@@ -23,19 +23,23 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.VpnService;
 import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.ParcelFileDescriptor;
-import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
-
-import androidx.preference.PreferenceManager;
 import android.text.TextUtils;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
+import androidx.core.net.ConnectivityManagerCompat;
+import androidx.preference.PreferenceManager;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -51,6 +55,7 @@ import tun.utils.SharedPrefUtil;
 
 /**
  * VPNService.
+ *
  * @author <a href="mailto:raise.isayan@gmail.com">raise.isayan@gmail.com</a>
  */
 public class TunProxyVpnService extends VpnService {
@@ -63,10 +68,13 @@ public class TunProxyVpnService extends VpnService {
 
     private static final String ACTION_START = "start";
     private static final String ACTION_STOP = "stop";
-    private static volatile PowerManager.WakeLock wlInstance = null;
 
     private long jniContext;
     private Thread tunnelThread = null;
+
+    private ConnectivityManager cm;
+    private ConnectivityManager.NetworkCallback networkCallback;
+    private Network currentNetwork;
 
     static {
         System.loadLibrary("tun2http");
@@ -74,14 +82,6 @@ public class TunProxyVpnService extends VpnService {
 
     private ParcelFileDescriptor vpn = null;
 
-    synchronized private static PowerManager.WakeLock getLock(Context context) {
-        if (wlInstance == null) {
-            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-            wlInstance = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, context.getString(R.string.app_name) + " wakelock");
-            wlInstance.setReferenceCounted(true);
-        }
-        return wlInstance;
-    }
 
     public static void start(Context context) {
         Intent intent = new Intent(context, TunProxyVpnService.class);
@@ -117,10 +117,6 @@ public class TunProxyVpnService extends VpnService {
         if (protocol != 6 /* TCP */ && protocol != 17 /* UDP */)
             return Process.INVALID_UID;
 
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        if (cm == null)
-            return Process.INVALID_UID;
-
         InetSocketAddress local = new InetSocketAddress(saddr, sport);
         InetSocketAddress remote = new InetSocketAddress(daddr, dport);
 
@@ -141,19 +137,38 @@ public class TunProxyVpnService extends VpnService {
 
     private void start() {
         if (vpn == null) {
-            Builder lastBuilder = getBuilder();
-            vpn = startVPN(lastBuilder);
-            if (vpn == null)
+            try {
+                vpn = getBuilder().establish();
+            } catch (SecurityException ex) {
+                throw ex;
+            } catch (Throwable ex) {
+                Log.e(TAG, "Could not start VPN.", ex);
+            }
+            if (vpn == null) {
                 throw new IllegalStateException(getString((R.string.msg_start_failed)));
-
+            }
             startNative(vpn);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            currentNetwork = cm.getActiveNetwork();
+            NetworkRequest.Builder builder = new NetworkRequest.Builder();
+            builder.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            cm.registerNetworkCallback(builder.build(), networkCallback);
         }
     }
 
     private void stop() {
         if (vpn != null) {
+            Log.i(TAG, "Stopping");
             stopNative(vpn);
-            stopVPN(vpn);
+            try {
+                vpn.close();
+            } catch (IOException ex) {
+                Log.e(TAG, "Error stopping VPN.", ex);
+            }
+            if (networkCallback != null) {
+                cm.unregisterNetworkCallback(networkCallback);
+            }
             vpn = null;
         }
         stopForeground(true);
@@ -162,22 +177,8 @@ public class TunProxyVpnService extends VpnService {
     @Override
     public void onRevoke() {
         Log.i(TAG, "Revoke");
-
         stop();
-        vpn = null;
-
         super.onRevoke();
-    }
-
-    private ParcelFileDescriptor startVPN(Builder builder) throws SecurityException {
-        try {
-            return builder.establish();
-        } catch (SecurityException ex) {
-            throw ex;
-        } catch (Throwable ex) {
-            Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
-            return null;
-        }
     }
 
     private Builder getBuilder() {
@@ -248,8 +249,7 @@ public class TunProxyVpnService extends VpnService {
                         Log.i(TAG, "Running tunnel context=" + jniContext);
                         try {
                             jni_run(jniContext, vpn.getFd(), false, 3);
-                        }
-                        catch (Throwable e) {
+                        } catch (Throwable e) {
                             Log.e(TAG, "Tunnel thread raised exception.", e);
                         }
                         Log.i(TAG, "Tunnel exited");
@@ -291,21 +291,35 @@ public class TunProxyVpnService extends VpnService {
         prefs.edit().putBoolean(PREF_RUNNING, false).apply();
     }
 
-    private void stopVPN(ParcelFileDescriptor pfd) {
-        Log.i(TAG, "Stopping");
-        try {
-            pfd.close();
-        } catch (IOException ex) {
-            Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
-        }
-    }
-
     @Override
     public void onCreate() {
         // Native init
         jniContext = jni_init(Build.VERSION.SDK_INT);
         super.onCreate();
+        cm = (ConnectivityManager) this.getSystemService(CONNECTIVITY_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onLost(@NonNull Network network) {
+                    if (currentNetwork.equals(network)) {
+                        Log.i(TAG, "Network connection lost.");
+                        stop();
+                        start();
+                    }
+                }
 
+                @Override
+                public void onAvailable(@NonNull Network network) {
+                    Network _currentNetwork = cm.getActiveNetwork();
+                    // new current network and we are not using it
+                    if (network.equals(_currentNetwork) && !currentNetwork.equals(network)) {
+                        Log.d(TAG, "Reconnecting after connection loss.");
+                        stop();
+                        start();
+                    }
+                }
+            };
+        }
     }
 
     @Override
@@ -328,17 +342,7 @@ public class TunProxyVpnService extends VpnService {
     @Override
     public void onDestroy() {
         Log.i(TAG, "Destroy");
-
-        try {
-            if (vpn != null) {
-                stopNative(vpn);
-                stopVPN(vpn);
-                vpn = null;
-            }
-        } catch (Throwable ex) {
-            Log.e(TAG, ex.toString() + "\n" + Log.getStackTraceString(ex));
-        }
-
+        stop();
         jni_done(jniContext);
         super.onDestroy();
     }
@@ -385,10 +389,10 @@ public class TunProxyVpnService extends VpnService {
         }
 
         @Override
-       public Builder addDnsServer(InetAddress address) {
+        public Builder addDnsServer(InetAddress address) {
             super.addDnsServer(address);
             return this;
-       }
+        }
 
         @Override
         public Builder addDnsServer(String address) {
@@ -397,7 +401,7 @@ public class TunProxyVpnService extends VpnService {
         }
 
         // min sdk 26
-        public void addAllowedApplication(final List<String> packageList, final List<String> notFoundPackageList)  {
+        public void addAllowedApplication(final List<String> packageList, final List<String> notFoundPackageList) {
             for (String pkg : packageList) {
                 try {
                     Log.i(TAG, "allowed:" + pkg);
@@ -408,7 +412,7 @@ public class TunProxyVpnService extends VpnService {
             }
         }
 
-        public void addDisallowedApplication(final List<String> packageList, final List<String> notFoundPackageList)  {
+        public void addDisallowedApplication(final List<String> packageList, final List<String> notFoundPackageList) {
             for (String pkg : packageList) {
                 try {
                     Log.i(TAG, "disallowed:" + pkg);
@@ -418,25 +422,6 @@ public class TunProxyVpnService extends VpnService {
                 }
             }
         }
-
-//        public boolean isNetworkConnected() {
-//            final ConnectivityManager cm = (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
-//            if (cm != null) {
-//                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-//                    final android.net.NetworkInfo ni = cm.getActiveNetworkInfo();
-//                    if (ni != null) {
-//                        return (ni.isConnected() && (ni.getType() == ConnectivityManager.TYPE_WIFI || ni.getType() == ConnectivityManager.TYPE_MOBILE));
-//                    }
-//                } else {
-//                    final Network n = cm.getActiveNetwork();
-//                    if (n != null) {
-//                        final NetworkCapabilities nc = cm.getNetworkCapabilities(n);
-//                        return (nc.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || nc.hasTransport(NetworkCapabilities.TRANSPORT_WIFI));
-//                    }
-//                }
-//            }
-//            return false;
-//        }
     }
 
 }
