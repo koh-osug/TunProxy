@@ -31,9 +31,12 @@ import androidx.annotation.Nullable;
 import java.util.HashSet;
 import java.util.List;
 
+import javax.inject.Inject;
+
 import tun.proxy.VpnPermissionSupportActivity;
 import tun.proxy.api.ITunProxyRemoteService;
-import tun.utils.SharedPrefUtil;
+import tun.proxy.di.DaggerWrapper;
+import tun.proxy.model.AppState;
 
 /**
  * Service for starting the VPN remotely.
@@ -45,6 +48,12 @@ public class TunProxyRemoteService extends Service {
     private static final String TAG = TunProxyRemoteService.class.getName();
 
     public static final String VPN_ALLOWED_BROADCAST = "TUN_PROXY_VPN_ALLOWED_BROADCAST_ACTION";
+
+    @Inject
+    AppState appState;
+    
+    @Inject
+    SharedPrefService sharedPrefService;
 
     private final BroadcastReceiver vpnAllowedOnActivityResult = new BroadcastReceiver() {
         @Override
@@ -64,23 +73,28 @@ public class TunProxyRemoteService extends Service {
 
         @Override
         public void startAllowed(String ip, int port, List allowedApps) throws RemoteException {
-            SharedPrefUtil.storeVPNMode(SharedPrefUtil.VPNMode.ALLOW, TunProxyRemoteService.this);
-            SharedPrefUtil.saveHostPort(ip, port, TunProxyRemoteService.this);
-            SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.ALLOW, new HashSet<String>(allowedApps), TunProxyRemoteService.this);
+            sharedPrefService.storeVPNMode(SharedPrefService.VPNMode.ALLOW);
+            sharedPrefService.saveHostPort(ip, port);
+            sharedPrefService.storeVPNApplication(SharedPrefService.VPNMode.ALLOW,
+                    new HashSet<String>(allowedApps));
+            appState.setStartedRemotely(true);
             requestVpnPermission();
         }
 
         @Override
         public void startDenied(String ip, int port, List deniedApps) throws RemoteException {
-            SharedPrefUtil.storeVPNMode(SharedPrefUtil.VPNMode.DISALLOW, TunProxyRemoteService.this);
-            SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, new HashSet<String>(deniedApps), TunProxyRemoteService.this);
-            SharedPrefUtil.saveHostPort(ip, port, TunProxyRemoteService.this);
+            sharedPrefService.storeVPNMode(SharedPrefService.VPNMode.DISALLOW);
+            sharedPrefService.storeVPNApplication(SharedPrefService.VPNMode.DISALLOW,
+                    new HashSet<String>(deniedApps));
+            sharedPrefService.saveHostPort(ip, port);
+            appState.setStartedRemotely(true);
             requestVpnPermission();
         }
 
         @Override
         public void stop() throws RemoteException {
             TunProxyVpnService.stop(TunProxyRemoteService.this);
+            appState.setStartedRemotely(false);
         }
     };
 
@@ -89,6 +103,7 @@ public class TunProxyRemoteService extends Service {
         IntentFilter i = new IntentFilter();
         i.addAction(VPN_ALLOWED_BROADCAST);
         registerReceiver(vpnAllowedOnActivityResult, i);
+        DaggerWrapper.getComponent(this).inject(this);
     }
 
     @Override

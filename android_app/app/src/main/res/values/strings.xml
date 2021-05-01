@@ -1,20 +1,16 @@
 <resources>
     <string name="app_name">TunProxy</string>
     <string name="app_disclaimer">TunProxy is a proxy forwarding tool using Android\'s VPNService.
-\n\n
-Copyright © 2021 raise-isayan / Karsten Ohme
-\n\n
-This program is free software: you can redistribute it and/or modify
+\n\nCopyright © 2021 raise-isayan / Karsten Ohme
+\n\nThis program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
-\n\n
-This program is distributed in the hope that it will be useful,
+\n\nThis program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-\n\n
-You should have received a copy of the GNU General Public License
+\n\nYou should have received a copy of the GNU General Public License
 along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;</string>
     <string name="app_about">TunProxy %1$s</string>
 
@@ -23,7 +19,7 @@ along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;</str
     <string name="notify_msg">Proxy is running</string>
     <string name="start">Start</string>
     <string name="stop">Stop</string>
-    <string name="msg_start_failed">Start failed</string>
+    <string name="msg_exception">Start failed</string>
     <string name="host_hint">Proxy address (ipv4:port)</string>
     <string name="enter_host">Enter valid ip v4 address</string>
     <string name="proxy">%1$s:%2$d</string>

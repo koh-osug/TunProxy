@@ -27,6 +27,8 @@ import android.content.pm.PackageManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -46,7 +48,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import tun.utils.SharedPrefUtil;
+import javax.inject.Inject;
+
+import tun.proxy.di.DaggerWrapper;
+import tun.proxy.service.SharedPrefService;
 
 /**
  * Settings activity of the app.
@@ -59,9 +64,13 @@ public class SettingsActivity extends AppCompatActivity {
     public enum AppSortBy {APPNAME, PKGNAME};
     public enum AppOrderBy {ASC, DESC};
 
+    @Inject
+    SharedPrefService sharedPrefService;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DaggerWrapper.getComponent(this).inject(this);
         setContentView(R.layout.activity_settings);
         if (savedInstanceState == null) {
             getSupportFragmentManager()
@@ -105,8 +114,12 @@ public class SettingsActivity extends AppCompatActivity {
         public static final String VPN_ALLOWED_APPLICATION_LIST = "vpn_allowed_application_list";
         public static final String VPN_CLEAR_ALL_SELECTION = "vpn_clear_all_selection";
 
+        @Inject
+        SharedPrefService sharedPrefService;
+
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+            DaggerWrapper.getComponent(getContext()).inject(this);
             addPreferencesFromResource(R.xml.preferences);
             setHasOptionsMenu(true);
 
@@ -123,21 +136,22 @@ public class SettingsActivity extends AppCompatActivity {
                 if (preference instanceof ListPreference) {
                     final ListPreference listPreference = (ListPreference) preference;
                     int index = listPreference.findIndexOfValue((String) value);
-                    prefDisallow.setEnabled(index == SharedPrefUtil.VPNMode.DISALLOW.ordinal());
-                    prefAllow.setEnabled(index ==  SharedPrefUtil.VPNMode.ALLOW.ordinal());
+                    prefDisallow.setEnabled(index == SharedPrefService.VPNMode.DISALLOW.ordinal());
+                    prefAllow.setEnabled(index ==  SharedPrefService.VPNMode.ALLOW.ordinal());
 
                     // Set the summary to reflect the new value.
                     preference.setSummary(index >= 0 ? listPreference.getEntries()[index] : null);
 
-                    SharedPrefUtil.VPNMode mode =  SharedPrefUtil.VPNMode.values()[index];
-                    SharedPrefUtil.storeVPNMode(mode, getContext());
+                    SharedPrefService.VPNMode mode =  SharedPrefService.VPNMode.values()[index];
+                    sharedPrefService.storeVPNMode(mode);
                 }
                 return true;
                 }
             });
-            prefPackage.setSummary(getResources().getStringArray(R.array.pref_vpn_connection_name)[SharedPrefUtil.loadVPNMode(this.getContext()).ordinal()]);
-            prefDisallow.setEnabled(SharedPrefUtil.VPNMode.DISALLOW.name().equals(prefPackage.getValue()));
-            prefAllow.setEnabled(SharedPrefUtil.VPNMode.ALLOW.name().equals(prefPackage.getValue()));
+            prefPackage.setSummary(getResources().getStringArray(R.array.pref_vpn_connection_name)[
+                    sharedPrefService.loadVPNMode().ordinal()]);
+            prefDisallow.setEnabled(SharedPrefService.VPNMode.DISALLOW.name().equals(prefPackage.getValue()));
+            prefAllow.setEnabled(SharedPrefService.VPNMode.ALLOW.name().equals(prefPackage.getValue()));
             updateMenuItem();
         }
 
@@ -145,8 +159,8 @@ public class SettingsActivity extends AppCompatActivity {
             final PreferenceScreen prefDisallow = findPreference(VPN_DISALLOWED_APPLICATION_LIST);
             final PreferenceScreen prefAllow = findPreference(VPN_ALLOWED_APPLICATION_LIST);
 
-            int countDisallow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.DISALLOW, getContext()).size();
-            int countAllow = SharedPrefUtil.loadVPNApplication(SharedPrefUtil.VPNMode.ALLOW, getContext()).size();
+            int countDisallow = sharedPrefService.loadVPNApplication(SharedPrefService.VPNMode.DISALLOW).size();
+            int countAllow = sharedPrefService.loadVPNApplication(SharedPrefService.VPNMode.ALLOW).size();
             prefDisallow.setTitle(getString(R.string.pref_header_disallowed_application_list, countDisallow));
             prefAllow.setTitle(getString(R.string.pref_header_disallowed_application_list, countAllow));
         }
@@ -171,10 +185,9 @@ public class SettingsActivity extends AppCompatActivity {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 Set<String> set = new HashSet<>();
-                                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.ALLOW, set,
-                                        getContext());
-                                SharedPrefUtil.storeVPNApplication(SharedPrefUtil.VPNMode.DISALLOW,
-                                        set, getContext());
+                                sharedPrefService.storeVPNApplication(SharedPrefService.VPNMode.ALLOW, set);
+                                sharedPrefService.storeVPNApplication(SharedPrefService.VPNMode.DISALLOW,
+                                        set);
                                 updateMenuItem();
                             }
                         })
@@ -187,22 +200,19 @@ public class SettingsActivity extends AppCompatActivity {
 
     }
 
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     public static class DisallowedPackageListFragment extends PackageListFragment {
         public DisallowedPackageListFragment() {
-            super(SharedPrefUtil.VPNMode.DISALLOW);
+            super(SharedPrefService.VPNMode.DISALLOW);
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     public static class AllowedPackageListFragment extends PackageListFragment  {
         public AllowedPackageListFragment() {
-            super(SharedPrefUtil.VPNMode.ALLOW);
+            super(SharedPrefService.VPNMode.ALLOW);
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
-    protected static class PackageListFragment extends PreferenceFragmentCompat
+    public static class PackageListFragment extends PreferenceFragmentCompat
             implements SearchView.OnQueryTextListener, SearchView.OnCloseListener {
         private final Map<String, Boolean> mAllPackageInfoMap = new HashMap<>();
         private final static String PREF_VPN_APPLICATION_ORDERBY = "pref_vpn_application_app_orderby";
@@ -211,13 +221,22 @@ public class SettingsActivity extends AppCompatActivity {
 
         private AsyncTaskProgress task;
 
-        private SharedPrefUtil.VPNMode mode;
+        private SharedPrefService.VPNMode mode;
         private AppSortBy appSortBy = AppSortBy.APPNAME;
         private AppOrderBy appOrderBy = AppOrderBy.ASC;
         private AppSortBy appFilterBy = AppSortBy.APPNAME;
         private PreferenceScreen mFilterPreferenceScreen;
 
-        public PackageListFragment(SharedPrefUtil.VPNMode mode) {
+        @Inject
+        SharedPrefService sharedPrefService;
+
+        @Override
+        public void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            DaggerWrapper.getComponent(getContext()).inject(this);
+        }
+
+        public PackageListFragment(SharedPrefService.VPNMode mode) {
             super();
             this.mode = mode;
             this.task = new AsyncTaskProgress(this);
@@ -233,9 +252,7 @@ public class SettingsActivity extends AppCompatActivity {
         @Override
         public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
             super.onCreateOptionsMenu(menu, inflater);
-            // Menuの設定
             inflater.inflate(R.menu.menu_search, menu);
-            //MenuCompat.setGroupDividerEnabled(menu, true);
 
             final MenuItem menuSearch = menu.findItem(R.id.menu_search_item);
             this.searchView = (SearchView) menuSearch.getActionView();
@@ -312,7 +329,6 @@ public class SettingsActivity extends AppCompatActivity {
                 task = new AsyncTaskProgress(this);
                 task.execute();
             }
-//            this.filterPackagesPreferences(filter, sortBy, orderBy);
         }
 
         @Override
@@ -336,7 +352,7 @@ public class SettingsActivity extends AppCompatActivity {
         @Override
         public void onResume() {
             super.onResume();
-            Set<String> loadMap = SharedPrefUtil.loadVPNApplication(this.mode, getContext());
+            Set<String> loadMap = sharedPrefService.loadVPNApplication(this.mode);
             for (String pkgName : loadMap) {
                 this.mAllPackageInfoMap.put(pkgName, loadMap.contains(pkgName));
             }
@@ -354,59 +370,8 @@ public class SettingsActivity extends AppCompatActivity {
             this.mFilterPreferenceScreen.removeAll();
         }
 
-//        private void filterPackagesPreferences(String filter, final AppSortBy sortBy, final MyApplication.AppOrderBy orderBy) {
-//            final Context context = SharedPrefUtil.getApplicationContext();
-//            final PackageManager pm = context.getPackageManager();
-//            final List<PackageInfo> installedPackages = pm.getInstalledPackages(PackageManager.GET_META_DATA);
-//            Collections.sort(installedPackages, new Comparator<PackageInfo>() {
-//                @Override
-//                public int compare(PackageInfo o1, PackageInfo o2) {
-//                    String t1 = "";
-//                    String t2 = "";
-//                    switch (sortBy) {
-//                        case APPNAME:
-//                            t1 = o1.applicationInfo.loadLabel(pm).toString();
-//                            t2 = o2.applicationInfo.loadLabel(pm).toString();
-//                            break;
-//                        case PKGNAME:
-//                            t1 = o1.packageName;
-//                            t2 = o2.packageName;
-//                            break;
-//                    }
-//                    if (MyApplication.AppOrderBy.ASC.equals(orderBy))
-//                        return t1.compareTo(t2);
-//                    else
-//                        return t2.compareTo(t1);
-//                }
-//            });
-//
-//            final Map<String, Boolean> installedPackageMap = new HashMap<>();
-//            for (final PackageInfo pi : installedPackages) {
-//                // exclude self package
-//                if (pi.packageName.equals(SharedPrefUtil.getPackageName())) {
-//                    continue;
-//                }
-//                boolean checked = this.mAllPackageInfoMap.containsKey(pi.packageName) ? this.mAllPackageInfoMap.get(pi.packageName) : false;
-//                installedPackageMap.put(pi.packageName, checked);
-//            }
-//            this.mAllPackageInfoMap.clear();
-//            this.mAllPackageInfoMap.putAll(installedPackageMap);
-//
-//            for (final PackageInfo pi : installedPackages) {
-//                // exclude self package
-//                if (pi.packageName.equals(SharedPrefUtil.getPackageName())) {
-//                    continue;
-//                }
-//                String t1 = pi.applicationInfo.loadLabel(pm).toString();
-//                if (filter.trim().isEmpty() || t1.toLowerCase().contains(filter.toLowerCase())) {
-//                    final Preference preference = buildPackagePreferences(pm, pi);
-//                    this.mFilterPreferenceScreen.addPreference(preference);
-//                }
-//            }
-//        }
-
         private Preference buildPackagePreferences(final PackageManager pm, final PackageInfo pi) {
-            final CheckBoxPreference prefCheck = new CheckBoxPreference(getActivity());
+            final CheckBoxPreference prefCheck = new CheckBoxPreference(getContext());
             prefCheck.setIcon(pi.applicationInfo.loadIcon(pm));
             prefCheck.setTitle(pi.applicationInfo.loadLabel(pm).toString());
             prefCheck.setSummary(pi.packageName);
@@ -470,8 +435,8 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         private void storeSelectedPackageSet(final Set<String> set) {
-            SharedPrefUtil.storeVPNMode(this.mode, getContext());
-            SharedPrefUtil.storeVPNApplication(this.mode, set, getContext());
+            sharedPrefService.storeVPNMode(this.mode);
+            sharedPrefService.storeVPNApplication(this.mode, set);
         }
 
         @Override

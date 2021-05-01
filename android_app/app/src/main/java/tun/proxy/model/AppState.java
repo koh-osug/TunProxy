@@ -16,37 +16,53 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package tun.proxy.di;
+package tun.proxy.model;
 
+import java.util.Observable;
+
+import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import dagger.Component;
-import tun.proxy.MainActivity;
-import tun.proxy.SettingsActivity;
-import tun.proxy.VpnPermissionSupportActivity;
-import tun.proxy.service.TunProxyRemoteService;
-import tun.proxy.service.TunProxyVpnService;
+import lombok.Getter;
 
 /**
- * Defines the injector.
+ * The app state,
  *
  * @author <a href="mailto:k_o_@users.sourceforge.net">Karsten Ohme (k_o_@users.sourceforge.net)</a>
  */
+@Getter
 @Singleton
-@Component(modules = {MainModule.class})
-public interface MainComponent {
+public class AppState extends Observable {
 
-    void inject(MainActivity activity);
+    boolean proxyRunning;
 
-    void inject(VpnPermissionSupportActivity activity);
+    boolean busy;
 
-    void inject(TunProxyRemoteService service);
+    boolean startedRemotely;
 
-    void inject(TunProxyVpnService service);
-    
-    void inject(SettingsActivity activity);
+    @Inject
+    public AppState() {
+    }
 
-    void inject(SettingsActivity.PackageListFragment packageListFragment);
 
-    void inject(SettingsActivity.SettingsFragment settingsFragment);
+    public void setProxyRunning(boolean proxyRunning) {
+        this.proxyRunning = proxyRunning;
+        update();
+    }
+
+    public void setBusy(boolean busy) {
+        this.busy = busy;
+        update();
+    }
+
+    public void setStartedRemotely(boolean startedRemotely) {
+        this.startedRemotely = startedRemotely;
+        update();
+    }
+
+    public void update() {
+        setChanged();
+        notifyObservers();
+    }
+
 }

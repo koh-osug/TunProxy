@@ -16,37 +16,17 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package tun.proxy.di;
+package tun.proxy.handler;
 
 import javax.inject.Singleton;
 
-import dagger.Component;
-import tun.proxy.MainActivity;
-import tun.proxy.SettingsActivity;
-import tun.proxy.VpnPermissionSupportActivity;
-import tun.proxy.service.TunProxyRemoteService;
-import tun.proxy.service.TunProxyVpnService;
-
 /**
- * Defines the injector.
+ * Handler for starting and stopping the proxy.
  *
  * @author <a href="mailto:k_o_@users.sourceforge.net">Karsten Ohme (k_o_@users.sourceforge.net)</a>
  */
 @Singleton
-@Component(modules = {MainModule.class})
-public interface MainComponent {
+public class ProxyHandler {
 
-    void inject(MainActivity activity);
 
-    void inject(VpnPermissionSupportActivity activity);
-
-    void inject(TunProxyRemoteService service);
-
-    void inject(TunProxyVpnService service);
-    
-    void inject(SettingsActivity activity);
-
-    void inject(SettingsActivity.PackageListFragment packageListFragment);
-
-    void inject(SettingsActivity.SettingsFragment settingsFragment);
 }

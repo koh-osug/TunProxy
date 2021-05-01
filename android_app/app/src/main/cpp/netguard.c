@@ -30,9 +30,6 @@ char socks5_username[127 + 1];
 char socks5_password[127 + 1];
 int loglevel = ANDROID_LOG_INFO;
 
-char http_proxy_addr[INET6_ADDRSTRLEN];
-int http_proxy_port = 0;
-
 extern int max_tun_msg;
 
 extern FILE *pcap_file;
@@ -92,8 +89,6 @@ Java_tun_proxy_service_TunProxyVpnService_jni_1init(
     socks5_port = 0;
     *socks5_username = NULL;
     *socks5_password = NULL;
-    *http_proxy_addr = NULL;
-    http_proxy_port = 0;
     pcap_file = NULL;
 
     if (pthread_mutex_init(&ctx->lock, NULL))
@@ -283,7 +278,7 @@ Java_tun_proxy_service_TunProxyVpnService_jni_1done(JNIEnv *env, jobject instanc
 // JNI Util
 
 JNIEXPORT jstring JNICALL
-Java_tun_utils_DnsUtil_jni_1getprop(JNIEnv *env, jclass type, jstring name_) {
+Java_tun_proxy_service_DnsService_jni_1getprop(JNIEnv *env, jclass type, jstring name_) {
     const char *name = (*env)->GetStringUTFChars(env, name_, 0);
     ng_add_alloc(name, "name");
 
@@ -535,29 +530,4 @@ void *ng_realloc(void *__ptr, size_t __byte_count, const char *tag) {
 void ng_free(void *__ptr, const char *file, int line) {
     ng_delete_alloc(__ptr, file, line);
     free(__ptr);
-}
-
-void ng_dump() {
-    int r = 0;
-    for (int c = 0; c < allocs; c++)
-        if (alloc[c].ptr != NULL)
-            log_android(ANDROID_LOG_WARN,
-                        "holding %d [%s] %s",
-                        ++r, alloc[c].tag, ctime(&alloc[c].time));
-}
-
-JNIEXPORT void JNICALL
-Java_eu_faircode_netguard_Util_dump_1memory_1profile(JNIEnv *env, jclass type) {
-#ifdef PROFILE_MEMORY
-    log_android(ANDROID_LOG_DEBUG, "Dump memory profile");
-
-    if (pthread_mutex_lock(alock))
-        log_android(ANDROID_LOG_ERROR, "pthread_mutex_lock failed");
-
-    ng_dump();
-
-    if (pthread_mutex_unlock(alock))
-        log_android(ANDROID_LOG_ERROR, "pthread_mutex_unlock failed");
-
-#endif
 }

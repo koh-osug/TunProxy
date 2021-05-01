@@ -17,45 +17,48 @@
  */
 package tun.proxy;
 
-import android.net.VpnService;
-import android.os.Bundle;
-
 import android.app.AlertDialog;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.VpnService;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.text.TextUtils;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.EditText;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.databinding.DataBindingUtil;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Observer;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 
-import android.os.Handler;
-import android.os.IBinder;
-import android.text.TextUtils;
-import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.widget.Button;
-import android.widget.EditText;
-
 import javax.inject.Inject;
 
+import tun.proxy.databinding.AppStateViewDataBinding;
 import tun.proxy.di.DaggerWrapper;
 import tun.proxy.event.HideAppEvent;
 import tun.proxy.event.SingleLiveEvent;
+import tun.proxy.model.AppState;
 import tun.proxy.service.TunProxyVpnService;
+import tun.proxy.view.AppStateViewModel;
 import tun.utils.IPUtil;
-import tun.utils.SharedPrefUtil;
+import tun.proxy.service.SharedPrefService;
 
 /**
  * Main activity of the app.
+ *
  * @author <a href="mailto:raise.isayan@gmail.com">raise.isayan@gmail.com</a>
  */
 public class MainActivity extends AppCompatActivity implements
@@ -63,8 +66,6 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final int REQUEST_VPN = 1;
 
-    private Button start;
-    private Button stop;
     private EditText hostEditText;
     private final Handler statusHandler = new Handler();
 
@@ -73,32 +74,31 @@ public class MainActivity extends AppCompatActivity implements
     @Inject
     SingleLiveEvent<HideAppEvent> hideAppEventSingleLiveEvent;
 
+    @Inject
+    SingleLiveEvent<Exception> exceptionEventSingleLiveEvent;
+
+    @Inject
+    AppState appState;
+
+    @Inject
+    AppStateViewModel appStateViewModel;
+
+    @Inject
+    SharedPrefService sharedPrefService;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         DaggerWrapper.getComponent(this).inject(this);
-        setContentView(R.layout.activity_main);
+
+        AppStateViewDataBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_main);
+        binding.setLifecycleOwner(this);
+        binding.setAppState(appStateViewModel);
+
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        start = findViewById(R.id.start);
-        stop = findViewById(R.id.stop);
         hostEditText = findViewById(R.id.host);
-
-        start.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startVpn();
-            }
-        });
-        stop.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                stopVpn();
-            }
-        });
-        start.setEnabled(true);
-        stop.setEnabled(false);
 
         hideAppEventSingleLiveEvent.observe(this, new Observer<HideAppEvent>() {
             @Override
@@ -110,8 +110,43 @@ public class MainActivity extends AppCompatActivity implements
                     }
                 });
             }
-});
+        });
+        exceptionEventSingleLiveEvent.observe(this, new Observer<Exception>() {
+            @Override
+            public void onChanged(final Exception ex) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        showError(ex);
+                    }
+                });
+            }
+        });
     }
+
+    private void showError(final Exception e) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                String errorMsg = e.getMessage();
+                androidx.appcompat.app.AlertDialog.Builder alertDialogBuilder = new androidx.appcompat.app.AlertDialog.Builder(MainActivity.this);
+                final androidx.appcompat.app.AlertDialog alertDialog = alertDialogBuilder
+                        .setTitle(R.string.msg_exception)
+                        .setMessage(errorMsg)
+                        .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int id) {
+                                dialog.dismiss();
+                            }
+                        }).
+                                setCancelable(false).create();
+
+                alertDialog.setCanceledOnTouchOutside(false);
+                alertDialog.show();
+            }
+        });
+    }
+
     @Override
     public boolean onPreferenceStartFragment(PreferenceFragmentCompat caller, Preference pref) {
         final Bundle args = pref.getExtras();
@@ -119,9 +154,9 @@ public class MainActivity extends AppCompatActivity implements
         fragment.setArguments(args);
         fragment.setTargetFragment(caller, 0);
         getSupportFragmentManager().beginTransaction()
-            .replace(R.id.activity_settings, fragment)
-            .addToBackStack(null)
-            .commit();
+                .replace(R.id.activity_settings, fragment)
+                .addToBackStack(null)
+                .commit();
         setTitle(pref.getTitle());
         return true;
     }
@@ -136,7 +171,7 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
         MenuItem item = menu.findItem(R.id.action_activity_settings);
-        item.setEnabled(start.isEnabled());
+        item.setEnabled(!appState.isProxyRunning());
         return true;
     }
 
@@ -152,9 +187,9 @@ public class MainActivity extends AppCompatActivity implements
                 break;
             case R.id.action_show_about:
                 new AlertDialog.Builder(this)
-                    .setTitle(getString(R.string.app_about, getVersionName()))
-                    .setMessage(R.string.app_disclaimer)
-                    .show();
+                        .setTitle(getString(R.string.app_about, getVersionName()))
+                        .setMessage(R.string.app_disclaimer)
+                        .show();
                 break;
             default:
                 return super.onOptionsItemSelected(item);
@@ -189,8 +224,6 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     protected void onResume() {
         super.onResume();
-        start.setEnabled(false);
-        stop.setEnabled(false);
         updateStatus();
 
         statusHandler.post(statusRunnable);
@@ -199,15 +232,11 @@ public class MainActivity extends AppCompatActivity implements
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
-    private boolean isRunning() {
-        return service != null && service.isRunning();
-    }
-
     private final Runnable statusRunnable = new Runnable() {
         @Override
         public void run() {
-        updateStatus();
-        statusHandler.post(statusRunnable);
+            updateStatus();
+            statusHandler.post(statusRunnable);
         }
     };
 
@@ -222,25 +251,16 @@ public class MainActivity extends AppCompatActivity implements
         if (service == null) {
             return;
         }
-        if (isRunning()) {
-            start.setEnabled(false);
-            hostEditText.setEnabled(false);
+        if (appState.isProxyRunning()) {
             loadHostPort();
-            stop.setEnabled(true);
-        } else {
-            start.setEnabled(true);
-            hostEditText.setEnabled(true);
-            stop.setEnabled(false);
         }
     }
 
-    private void stopVpn() {
-        start.setEnabled(true);
-        stop.setEnabled(false);
+    public void stopVpn(View view) {
         TunProxyVpnService.stop(this);
     }
 
-    private void startVpn() {
+    public void startVpn(View view) {
         Intent i = VpnService.prepare(this);
         if (i != null) {
             startActivityForResult(i, REQUEST_VPN);
@@ -256,8 +276,6 @@ public class MainActivity extends AppCompatActivity implements
             return;
         }
         if (requestCode == REQUEST_VPN && parseAndSaveHostPort()) {
-            start.setEnabled(false);
-            stop.setEnabled(true);
             TunProxyVpnService.start(this);
         }
     }
@@ -271,6 +289,7 @@ public class MainActivity extends AppCompatActivity implements
             return;
         }
         hostEditText.setText(getString(R.string.proxy, proxyHost, proxyPort));
+        hostEditText.setError(null);
     }
 
     private boolean parseAndSaveHostPort() {
@@ -290,7 +309,7 @@ public class MainActivity extends AppCompatActivity implements
             }
         }
         String host = parts[0];
-        SharedPrefUtil.saveHostPort(host, port, this);
+        sharedPrefService.saveHostPort(host, port);
         return true;
     }
 }

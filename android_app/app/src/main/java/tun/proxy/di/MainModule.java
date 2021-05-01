@@ -57,6 +57,12 @@ public class MainModule {
 
     @Provides
     @Singleton
+    public SingleLiveEvent<Exception> exceptionSingleLiveEvent() {
+        return new SingleLiveEvent<>();
+    }
+
+    @Provides
+    @Singleton
     public SingleLiveEvent<HideAppEvent> hideAppSingleLiveEvent() {
         return new SingleLiveEvent<>();
     }
