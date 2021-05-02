@@ -113,7 +113,7 @@ public class TunProxyVpnService extends VpnService {
             networkCallback = new ConnectivityManager.NetworkCallback() {
                 @Override
                 public void onLost(@NonNull Network network) {
-                    if (currentNetwork.equals(network)) {
+                    if (currentNetwork != null && currentNetwork.equals(network)) {
                         Log.i(TAG, "Network connection lost.");
                         stop();
                         start();
@@ -124,7 +124,8 @@ public class TunProxyVpnService extends VpnService {
                 public void onAvailable(@NonNull Network network) {
                     Network _currentNetwork = cm.getActiveNetwork();
                     // new current network and we are not using it
-                    if (network.equals(_currentNetwork) && !currentNetwork.equals(network)) {
+                    if (network.equals(_currentNetwork) &&
+                            (currentNetwork == null || !currentNetwork.equals(network))) {
                         Log.d(TAG, "Reconnecting after connection loss.");
                         stop();
                         start();

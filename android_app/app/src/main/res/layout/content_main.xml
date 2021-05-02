@@ -52,7 +52,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:onClick="stopVpn"
-            android:enabled="@{appState.proxyRunning}"
+            android:enabled="@{appState.proxyRunning &amp;&amp; !appState.startedRemotely}"
             android:text="@string/stop" />
 
     </LinearLayout>
