@@ -17,51 +17,67 @@
  */
 package tun.proxy.service;
 
-import android.app.Service;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.lifecycle.LifecycleService;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
 
 import javax.inject.Inject;
 
+import lombok.AllArgsConstructor;
 import tun.proxy.VpnPermissionSupportActivity;
+import tun.proxy.api.IStartStopCallback;
 import tun.proxy.api.ITunProxyRemoteService;
 import tun.proxy.di.DaggerWrapper;
 import tun.proxy.model.AppState;
+import tun.proxy.model.VpnGrantState;
 
 /**
  * Service for starting the VPN remotely.
  *
  * @author <a href="mailto:k_o_@users.sourceforge.net">Karsten Ohme (k_o_@users.sourceforge.net)</a>
  */
-public class TunProxyRemoteService extends Service {
+public class TunProxyRemoteService extends LifecycleService {
 
     private static final String TAG = TunProxyRemoteService.class.getName();
 
-    public static final String VPN_ALLOWED_BROADCAST = "TUN_PROXY_VPN_ALLOWED_BROADCAST_ACTION";
-
     @Inject
     AppState appState;
-    
+
     @Inject
     SharedPrefService sharedPrefService;
 
-    private final BroadcastReceiver vpnAllowedOnActivityResult = new BroadcastReceiver() {
+    @Inject
+    VpnGrantState vpnGrantState;
+
+    @AllArgsConstructor
+    private class StartStopCallbackObserver implements Observer {
+
         @Override
-        public void onReceive(Context context, Intent intent) {
-            Log.i(TAG, "Starting remotely triggered service.");
-            TunProxyVpnService.start(TunProxyRemoteService.this);
+        public void update(Observable o, Object arg) {
+            VpnGrantState vpnGrantState = (VpnGrantState)o;
+            appState.setStartedRemotely(vpnGrantState.isVpnGranted());
+            try {
+                if (vpnGrantState.isVpnGranted()) {
+                    vpnGrantState.getCb().onSuccess();
+                    Log.i(TAG, "Starting remotely triggered service.");
+                    TunProxyVpnService.start(TunProxyRemoteService.this);
+                } else {
+                    vpnGrantState.getCb().onPermissionDenied();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Could not invoke callback.", e);
+            }
         }
-    };
+    }
 
     private final ITunProxyRemoteService.Stub binder = new ITunProxyRemoteService.Stub() {
 
@@ -72,48 +88,50 @@ public class TunProxyRemoteService extends Service {
         }
 
         @Override
-        public void startAllowed(String ip, int port, List allowedApps) throws RemoteException {
+        public void startAllowed(String ip, int port, List allowedApps, final IStartStopCallback cb) throws RemoteException {
             sharedPrefService.storeVPNMode(SharedPrefService.VPNMode.ALLOW);
             sharedPrefService.saveHostPort(ip, port);
             sharedPrefService.storeVPNApplication(SharedPrefService.VPNMode.ALLOW,
                     new HashSet<String>(allowedApps));
-            appState.setStartedRemotely(true);
+            vpnGrantState.setCb(cb);
             requestVpnPermission();
         }
 
         @Override
-        public void startDenied(String ip, int port, List deniedApps) throws RemoteException {
+        public void startDenied(String ip, int port, List deniedApps, IStartStopCallback cb) throws RemoteException {
             sharedPrefService.storeVPNMode(SharedPrefService.VPNMode.DISALLOW);
             sharedPrefService.storeVPNApplication(SharedPrefService.VPNMode.DISALLOW,
                     new HashSet<String>(deniedApps));
             sharedPrefService.saveHostPort(ip, port);
-            appState.setStartedRemotely(true);
+            vpnGrantState.setCb(cb);
             requestVpnPermission();
         }
 
         @Override
-        public void stop() throws RemoteException {
+        public void stop(IStartStopCallback cb) throws RemoteException {
             TunProxyVpnService.stop(TunProxyRemoteService.this);
             appState.setStartedRemotely(false);
+            cb.onSuccess();
         }
     };
 
     @Override
     public void onCreate() {
-        IntentFilter i = new IntentFilter();
-        i.addAction(VPN_ALLOWED_BROADCAST);
-        registerReceiver(vpnAllowedOnActivityResult, i);
+        super.onCreate();
         DaggerWrapper.getComponent(this).inject(this);
+        vpnGrantState.addObserver(new StartStopCallbackObserver());
     }
 
     @Override
     public void onDestroy() {
-        unregisterReceiver(vpnAllowedOnActivityResult);
+        super.onDestroy();
+        vpnGrantState.deleteObservers();
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
+        super.onBind(intent);
         return binder;
     }
 

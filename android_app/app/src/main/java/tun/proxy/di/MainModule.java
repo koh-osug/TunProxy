@@ -19,6 +19,7 @@
 package tun.proxy.di;
 
 import android.content.Context;
+import android.database.Observable;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -71,6 +72,13 @@ public class MainModule {
     @Singleton
     @Named("running")
     public SingleLiveEvent<Boolean> proxyRunningSingleLiveEvent() {
+        return new SingleLiveEvent<>();
+    }
+
+    @Provides
+    @Singleton
+    @Named("vpnpermission")
+    public SingleLiveEvent<Boolean> vpnPermissionGrantedSingleLiveEvent() {
         return new SingleLiveEvent<>();
     }
 

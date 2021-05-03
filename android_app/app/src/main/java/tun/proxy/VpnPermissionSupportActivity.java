@@ -21,7 +21,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.VpnService;
 import android.os.Bundle;
-import android.os.PersistableBundle;
 import android.util.Log;
 
 import androidx.activity.ComponentActivity;
@@ -31,12 +30,15 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 
+import java.util.concurrent.ExecutorService;
+
 import javax.inject.Inject;
+import javax.inject.Named;
 
 import tun.proxy.di.DaggerWrapper;
 import tun.proxy.event.HideAppEvent;
 import tun.proxy.event.SingleLiveEvent;
-import tun.proxy.service.TunProxyRemoteService;
+import tun.proxy.model.VpnGrantState;
 
 /**
  * Transparent activity to handle the permission to open a VPN for the remote service.
@@ -49,6 +51,12 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
 
     @Inject
     SingleLiveEvent<HideAppEvent> hideAppEventSingleLiveEvent;
+
+    @Inject
+    VpnGrantState vpnGrantState;
+
+    @Inject
+    ExecutorService executorService;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -64,11 +72,9 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
                 new ActivityResultCallback<ActivityResult>() {
                     @Override
                     public void onActivityResult(ActivityResult result) {
-                        if (result.getResultCode() == Activity.RESULT_OK) {
-                            Intent i = new Intent();
-                            i.setAction(TunProxyRemoteService.VPN_ALLOWED_BROADCAST);
-                            sendBroadcast(i);
-                        }
+                        executorService.submit(() -> {
+                            vpnGrantState.setVpnGranted(result.getResultCode() == Activity.RESULT_OK);
+                        });
                         hideAppEventSingleLiveEvent.postValue(new HideAppEvent());
                         finishAndRemoveTask();
                     }
@@ -77,12 +83,11 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
         // already prepared if null
         if (i != null) {
             activityResultLauncher.launch(i);
-        }
-        else {
+        } else {
             // notify caller that we are already prepared
-            i = new Intent();
-            i.setAction(TunProxyRemoteService.VPN_ALLOWED_BROADCAST);
-            sendBroadcast(i);
+            executorService.submit(() -> {
+                vpnGrantState.setVpnGranted(true);
+            });
             hideAppEventSingleLiveEvent.postValue(new HideAppEvent());
             finishAndRemoveTask();
         }

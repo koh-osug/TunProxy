@@ -24,39 +24,30 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import lombok.Getter;
+import lombok.Setter;
+import tun.proxy.api.IStartStopCallback;
 
 /**
- * The app state.
+ * The VPN grant state.
  *
  * @author <a href="mailto:k_o_@users.sourceforge.net">Karsten Ohme (k_o_@users.sourceforge.net)</a>
  */
 @Getter
 @Singleton
-public class AppState extends Observable {
+public class VpnGrantState extends Observable {
 
-    boolean proxyRunning;
+    boolean vpnGranted;
 
-    boolean busy;
-
-    boolean startedRemotely;
+    @Setter
+    IStartStopCallback cb;
 
     @Inject
-    public AppState() {
+    public VpnGrantState() {
     }
 
 
-    public void setProxyRunning(boolean proxyRunning) {
-        this.proxyRunning = proxyRunning;
-        update();
-    }
-
-    public void setBusy(boolean busy) {
-        this.busy = busy;
-        update();
-    }
-
-    public void setStartedRemotely(boolean startedRemotely) {
-        this.startedRemotely = startedRemotely;
+    public void setVpnGranted(boolean vpnGranted) {
+        this.vpnGranted = vpnGranted;
         update();
     }
 
