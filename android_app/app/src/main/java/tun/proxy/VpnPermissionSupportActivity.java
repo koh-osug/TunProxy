@@ -69,12 +69,12 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
                             i.setAction(TunProxyRemoteService.VPN_ALLOWED_BROADCAST);
                             sendBroadcast(i);
                         }
-                        finish();
                         hideAppEventSingleLiveEvent.postValue(new HideAppEvent());
+                        finishAndRemoveTask();
                     }
                 });
         Intent i = VpnService.prepare(this);
-        // already prepared iff null
+        // already prepared if null
         if (i != null) {
             activityResultLauncher.launch(i);
         }
@@ -83,8 +83,8 @@ public class VpnPermissionSupportActivity extends ComponentActivity {
             i = new Intent();
             i.setAction(TunProxyRemoteService.VPN_ALLOWED_BROADCAST);
             sendBroadcast(i);
-            finish();
             hideAppEventSingleLiveEvent.postValue(new HideAppEvent());
+            finishAndRemoveTask();
         }
     }
 
